@@ -1,0 +1,6 @@
+cAsyncSocket = 0, 0, 0, 0, C
+mdGlobals = 0, 0, 0, 0, C
+mdTlsThunks = 0, 0, 0, 0, C
+cRequestHandler = 0, 0, 0, 0, C
+cTlsSocket = 0, 0, 0, 0, C
+Form2 = 0, 0, 0, 0, C, 0, 0, 0, 0, C

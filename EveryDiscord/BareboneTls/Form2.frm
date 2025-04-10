@@ -85,6 +85,7 @@ Private Sub btnLogin_Click()
     
     ' Trigger login in the main form
     Form1.txtToken.Text = txtToken.Text
+    Unload Me
 End Sub
 
 Private Sub Form_Load()

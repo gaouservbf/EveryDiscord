@@ -1,7 +1,7 @@
 VERSION 5.00
 Object = "{248DD890-BB45-11CF-9ABC-0080C7E7B78D}#1.0#0"; "MSWINSCK.OCX"
 Begin VB.Form Form1 
-   Caption         =   "Form1"
+   Caption         =   "EveryDiscord"
    ClientHeight    =   8055
    ClientLeft      =   105
    ClientTop       =   555
@@ -10,17 +10,24 @@ Begin VB.Form Form1
    ScaleHeight     =   8055
    ScaleWidth      =   10215
    StartUpPosition =   3  'Windows Default
+   Begin VB.ListBox lstChannel 
+      Height          =   6495
+      Left            =   960
+      TabIndex        =   6
+      Top             =   0
+      Width           =   2175
+   End
    Begin VB.ListBox lstGuild 
       Height          =   6495
       Left            =   0
-      TabIndex        =   6
+      TabIndex        =   5
       Top             =   0
       Width           =   975
    End
    Begin VB.TextBox txtCID 
       Height          =   375
       Left            =   240
-      TabIndex        =   4
+      TabIndex        =   3
       Text            =   "1355226543160557778"
       Top             =   6600
       Width           =   7095
@@ -28,26 +35,19 @@ Begin VB.Form Form1
    Begin VB.TextBox txtToken 
       Height          =   375
       Left            =   240
-      TabIndex        =   3
+      TabIndex        =   2
       Text            =   "Token"
       Top             =   7080
+      Visible         =   0   'False
       Width           =   7095
    End
    Begin VB.TextBox txtMsg 
       Height          =   375
       Left            =   240
-      TabIndex        =   2
+      TabIndex        =   1
       Text            =   "Text1"
       Top             =   7560
-      Width           =   7095
-   End
-   Begin VB.CommandButton cmdLogin 
-      Caption         =   "Login"
-      Height          =   375
-      Left            =   9240
-      TabIndex        =   1
-      Top             =   6720
-      Width           =   855
+      Width           =   9015
    End
    Begin VB.Timer Timer1 
       Interval        =   5000
@@ -57,9 +57,9 @@ Begin VB.Form Form1
    Begin VB.CommandButton cmdSendMsg 
       Caption         =   "Send"
       Height          =   375
-      Left            =   8520
+      Left            =   9360
       TabIndex        =   0
-      Top             =   7440
+      Top             =   7560
       Width           =   735
    End
    Begin MSWinsockLib.Winsock wscSocket 
@@ -71,15 +71,17 @@ Begin VB.Form Form1
    End
    Begin VB.ListBox lstMessages 
       Height          =   6495
-      Left            =   1560
-      TabIndex        =   5
+      Left            =   3120
+      TabIndex        =   4
       Top             =   0
-      Width           =   7935
+      Width           =   7095
    End
    Begin VB.Menu mnuMessages 
       Caption         =   "Messages"
-      Index           =   0
       Visible         =   0   'False
+      Begin VB.Menu delms 
+         Caption         =   "Delete Message"
+      End
    End
 End
 Attribute VB_Name = "Form1"
@@ -166,6 +168,13 @@ Private Sub SendData(baData() As Byte)
     End If
 End Sub
 
+Private Sub lstMessages_MouseDown(Button As Integer, Shift As Integer, X As Single, Y As Single)
+If Button = vbRightButton Then
+
+PopupMenu mnuMessages, , X + lstMessages.Left, Y + lstMessages.Top
+End If
+End Sub
+
 Private Sub Timer1_Timer()
 
     FetchChannelMessages txtCID.Text
@@ -199,6 +208,7 @@ EH:
 End Sub
 
 Private Sub wscSocket_DataArrival(ByVal bytesTotal As Long)
+On Error Resume Next
     Dim bError              As Boolean
     Dim baRecv()            As Byte
     Dim baOutput()          As Byte
@@ -311,6 +321,132 @@ Private Sub OnDataArrival(ByVal bytesTotal As Long, baData() As Byte)
     End If
 End Sub
 
+
+
+Private Sub FetchUserGuilds()
+    On Error GoTo EH
+    
+    ' Create the API request path
+    Dim sPath As String
+    sPath = "api/v10/users/@me/guilds"
+    
+    ' Prepare the HTTP request
+    m_sRequest = "GET /" & sPath & " HTTP/1.1" & vbCrLf & _
+              "Host: " & m_sBaseUrl & vbCrLf & _
+              "Authorization: " & m_sToken & vbCrLf & _
+              "Connection: close" & vbCrLf & vbCrLf
+    
+    ' Connect to Discord API
+    Connect m_sBaseUrl, 443
+    Exit Sub
+EH:
+    MsgBox "Error fetching guilds: " & Err.Description, vbCritical
+End Sub
+
+Private Sub FetchGuildChannels(ByVal sGuildId As String)
+    On Error GoTo EH
+    
+    ' Create the API request path
+    Dim sPath As String
+    sPath = "api/v10/guilds/" & sGuildId & "/channels"
+    
+    ' Prepare the HTTP request
+    m_sRequest = "GET /" & sPath & " HTTP/1.1" & vbCrLf & _
+              "Host: " & m_sBaseUrl & vbCrLf & _
+              "Authorization: " & m_sToken & vbCrLf & _
+              "Connection: close" & vbCrLf & vbCrLf
+    
+    ' Connect to Discord API
+    Connect m_sBaseUrl, 443
+    Exit Sub
+EH:
+    MsgBox "Error fetching channels: " & Err.Description, vbCritical
+End Sub
+
+
+Private Sub ProcessGuildsResponse(aJson As String)
+    Dim parsed As ParseResult
+    Dim i As Long
+    Dim sjson As String
+    
+    sjson = Left$(aJson, Len(aJson) - 5)
+    ' Parse the JSON array
+    parsed = Parse(sjson)
+ 
+    If Not parsed.IsValid Then
+        Exit Sub
+    End If
+    
+    ' Clear existing guilds
+    lstGuild.Clear
+    
+    ' Process each guild
+    For i = 0 To 15
+        On Error Resume Next
+        Dim guild As Object
+        Set guild = parsed.Value(i)
+        
+        ' Skip if no more guilds
+        If guild Is Nothing Then Exit For
+        
+        ' Extract guild details
+        Dim sGuildName As String
+        Dim sGuildId As String
+        
+        sGuildName = guild("name")
+        sGuildId = guild("id")
+        
+        ' Add to listbox
+        lstGuild.AddItem sGuildName
+        ' Use the NewIndex property to get the correct index for ItemData
+        lstGuild.ItemData(lstGuild.NewIndex) = Val(sGuildId)
+        
+        ' Debug output
+        Debug.Print "Added guild: " & sGuildName & " with ID: " & sGuildId
+    Next i
+End Sub
+
+Private Sub ProcessChannelsResponse(aJson As String)
+    Dim parsed As ParseResult
+    Dim i As Long
+    Dim sjson As String
+    
+    sjson = Left$(aJson, Len(aJson) - 5)
+    ' Parse the JSON array
+    parsed = Parse(sjson)
+ 
+    If Not parsed.IsValid Then
+        Exit Sub
+    End If
+    
+    ' Clear existing channels
+    lstChannel.Clear
+    
+    ' Process each channel
+    For i = 0 To 15
+        On Error Resume Next
+        Dim channel As Object
+        Set channel = parsed.Value(i)
+        
+        ' Extract channel details
+        Dim sChannelName As String
+        Dim sChannelId As String
+        Dim lChannelType As Long
+        
+        sChannelName = channel("name")
+        sChannelId = channel("id")
+        lChannelType = channel("type")
+        
+        ' Only add text channels (type 0)
+        If lChannelType = 0 Then
+            ' Add to listbox with ID as ItemData
+            lstChannel.AddItem sChannelName
+            lstChannel.ItemData(lstChannel.NewIndex) = sChannelId
+        End If
+    Next i
+End Sub
+
+' Update the OnDataArrival processing to handle channel responses
 Private Sub ProcessCompleteResponse()
     ' Parse HTTP response
     Dim sContent As String
@@ -328,6 +464,9 @@ Private Sub ProcessCompleteResponse()
     ElseIf InStr(m_sRequest, "api/v10/users/@me/guilds") > 0 Then
         ' This is a guilds response
         ProcessGuildsResponse sContent
+    ElseIf InStr(m_sRequest, "api/v10/guilds/") > 0 And InStr(m_sRequest, "/channels") > 0 Then
+        ' This is a channels response
+        ProcessChannelsResponse sContent
     End If
     
     ' Reset buffer and flags
@@ -335,75 +474,34 @@ Private Sub ProcessCompleteResponse()
     m_bReceivingData = False
     m_lContentLength = 0
 End Sub
-Private Sub FetchUserGuilds()
-    On Error GoTo EH
+
+' Add these click event handlers for the listboxes
+Private Sub lstGuild_Click()
+    ' Get the selected guild ID
+    Dim selectedIndex As Long
+    selectedIndex = lstGuild.ListIndex
     
-    ' Create the API request path
-    Dim sPath As String
-    sPath = "api/v10/users/@me/guilds"
-    
-    ' Prepare the HTTP request
-    m_sRequest = "GET /" & sPath & " HTTP/1.1" & vbCrLf & _
-              "Host: " & m_sBaseUrl & vbCrLf & _
-              "Authorization: " & m_sToken & vbCrLf & _
-              "Connection: close" & vbCrLf & vbCrLf
-    
-    ' Connect to Discord API
-    Connect m_sBaseUrl, 443
-EH:
-    MsgBox "Error fetching guilds: " & Err.Description, vbCritical
+    If selectedIndex >= 0 Then
+        ' Fetch channels for this guild
+        FetchGuildChannels lstGuild.ItemData(selectedIndex)
+        MsgBox lstGuild.ItemData(selectedIndex)
+    End If
 End Sub
 
-Private Sub ProcessGuildsResponse(aJson As String)
-    ' Debug print to check what's being received
-    Debug.Print "Processing Guilds JSON: " & Left$(aJson, 100) & "..."
+Private Sub lstChannel_Click()
+    ' Get the selected channel ID
+    Dim selectedIndex As Long
+    selectedIndex = lstChannel.ListIndex
     
-    ' Check if JSON is empty or invalid
-    If Len(Trim(aJson)) = 0 Then
-        Debug.Print "Empty JSON received"
-        Exit Sub
+    If selectedIndex >= 0 Then
+        ' Set the channel ID in the textbox
+        txtCID.Text = lstChannel.ItemData(selectedIndex)
+        
+        ' Fetch messages for this channel
+        FetchChannelMessages txtCID.Text
     End If
-    
-    Dim sjson As String
-    sjson = Left$(aJson, Len(aJson) - 5)
-    
-    ' Debug print
-    Debug.Print "Processed Guilds JSON length: " & Len(sjson)
-    
-    ' Parse the JSON array
-    Dim parsed As ParseResult
-    parsed = Parse(sjson)
-    
-    If Not parsed.IsValid Then
-       MsgBox "JSON Parse Error: " & parsed.Error, vbExclamation
-       Exit Sub
-    End If
-    
-    ' Clear existing guilds
-    lstGuild.Clear
-    
-    ' Process each guild
-    Dim i As Long
-    For i = 0 To parsed.Count - 1
-        Dim guild As Object
-        Set guild = parsed.Value(i)
-        
-        ' Extract guild details
-        Dim sName As String
-        Dim sId As String
-        
-        On Error Resume Next ' Handle potential missing fields
-        sName = guild("name")
-        sId = guild("id")
-        
-        ' Add to listbox with ID as ItemData if possible
-        lstGuild.AddItem sName
-        ' Store the guild ID for later use (if the listbox supports ItemData)
-        On Error Resume Next
-        lstGuild.ItemData(lstGuild.NewIndex) = sId
-
-    Next i
 End Sub
+
 Private Sub ProcessMessagesResponse(aJson As String)
     Dim parsed As ParseResult
     Dim i As Long
@@ -536,8 +634,6 @@ Private Sub Form_Load()
     ' Initialize the form
     m_sBaseUrl = "discord.com"
     
-    ' Setup form with needed controls
-    Me.Caption = "Discord Client"
     
 
     
@@ -556,6 +652,8 @@ Private Sub Form_Load()
         
         ' Auto-fetch messages if we have both token and channel
  FetchChannelMessages (txtCID)
+ 
+    FetchUserGuilds
     End If
 End Sub
 
