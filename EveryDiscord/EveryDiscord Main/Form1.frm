@@ -171,7 +171,7 @@ End Sub
 Private Sub Timer1_Timer()
 
     FetchChannelMessages txtCID.Text
-    'FetchUserGuilds
+    FetchUserGuilds
 End Sub
 
 Private Sub Timer2_Timer()
@@ -314,6 +314,125 @@ Private Sub OnDataArrival(ByVal bytesTotal As Long, baData() As Byte)
     End If
 End Sub
 
+
+
+Private Sub FetchUserGuilds()
+    On Error GoTo EH
+    
+    ' Create the API request path
+    Dim sPath As String
+    sPath = "api/v10/users/@me/guilds"
+    
+    ' Prepare the HTTP request
+    m_sRequest = "GET /" & sPath & " HTTP/1.1" & vbCrLf & _
+              "Host: " & m_sBaseUrl & vbCrLf & _
+              "Authorization: " & m_sToken & vbCrLf & _
+              "Connection: close" & vbCrLf & vbCrLf
+    
+    ' Connect to Discord API
+    Connect m_sBaseUrl, 443
+    Exit Sub
+EH:
+    MsgBox "Error fetching guilds: " & Err.Description, vbCritical
+End Sub
+
+Private Sub FetchGuildChannels(ByVal sGuildId As String)
+    On Error GoTo EH
+    
+    ' Create the API request path
+    Dim sPath As String
+    sPath = "api/v10/guilds/" & sGuildId & "/channels"
+    
+    ' Prepare the HTTP request
+    m_sRequest = "GET /" & sPath & " HTTP/1.1" & vbCrLf & _
+              "Host: " & m_sBaseUrl & vbCrLf & _
+              "Authorization: " & m_sToken & vbCrLf & _
+              "Connection: close" & vbCrLf & vbCrLf
+    
+    ' Connect to Discord API
+    Connect m_sBaseUrl, 443
+    Exit Sub
+EH:
+    MsgBox "Error fetching channels: " & Err.Description, vbCritical
+End Sub
+
+Private Sub ProcessGuildsResponse(aJson As String)
+    Dim parsed As ParseResult
+    Dim i As Long
+    Dim sjson As String
+    
+    sjson = Left$(aJson, Len(aJson) - 5)
+    ' Parse the JSON array
+    parsed = Parse(sjson)
+ 
+    If Not parsed.IsValid Then
+        Exit Sub
+    End If
+    
+    ' Clear existing guilds
+    lstGuild.Clear
+    
+    ' Process each guild
+    For i = 0 To 15
+        On Error Resume Next
+        Dim guild As Object
+        Set guild = parsed.Value(i)
+        
+        ' Extract guild details
+        Dim sGuildName As String
+        Dim sGuildId As String
+        
+        sGuildName = guild("name")
+        sGuildId = guild("id")
+        MsgBox sGuildId & " " & sGuildName
+        ' Add to listbox with ID as ItemData
+        lstGuild.AddItem sGuildName
+        lstGuild.ItemData(i) = sGuildId
+
+    Next i
+End Sub
+
+Private Sub ProcessChannelsResponse(aJson As String)
+    Dim parsed As ParseResult
+    Dim i As Long
+    Dim sjson As String
+    
+    sjson = Left$(aJson, Len(aJson) - 5)
+    ' Parse the JSON array
+    parsed = Parse(sjson)
+ 
+    If Not parsed.IsValid Then
+        Exit Sub
+    End If
+    
+    ' Clear existing channels
+    lstChannel.Clear
+    
+    ' Process each channel
+    For i = 0 To 15
+        On Error Resume Next
+        Dim channel As Object
+        Set channel = parsed.Value(i)
+        
+        ' Extract channel details
+        Dim sChannelName As String
+        Dim sChannelId As String
+        Dim lChannelType As Long
+        
+        sChannelName = channel("name")
+        sChannelId = channel("id")
+        lChannelType = channel("type")
+        
+        ' Only add text channels (type 0)
+        If lChannelType = 0 Then
+            ' Add to listbox with ID as ItemData
+            lstChannel.AddItem sChannelName
+            lstChannel.ItemData(lstChannel.NewIndex) = sChannelId
+        End If
+    Next i
+End Sub
+
+' Update the OnDataArrival processing to handle channel responses
 Private Sub ProcessCompleteResponse()
     ' Parse HTTP response
     Dim sContent As String
@@ -330,13 +449,43 @@ Private Sub ProcessCompleteResponse()
         ProcessMessagesResponse sContent
     ElseIf InStr(m_sRequest, "api/v10/users/@me/guilds") > 0 Then
         ' This is a guilds response
-        'ProcessGuildsResponse sContent
+        ProcessGuildsResponse sContent
+    ElseIf InStr(m_sRequest, "api/v10/guilds/") > 0 And InStr(m_sRequest, "/channels") > 0 Then
+        ' This is a channels response
+        ProcessChannelsResponse sContent
     End If
     
     ' Reset buffer and flags
     m_sResponseBuffer = ""
     m_bReceivingData = False
     m_lContentLength = 0
+End Sub
+
+' Add these click event handlers for the listboxes
+Private Sub lstGuild_Click()
+    ' Get the selected guild ID
+    Dim selectedIndex As Long
+    selectedIndex = lstGuild.ListIndex
+    
+    If selectedIndex >= 0 Then
+        ' Fetch channels for this guild
+        FetchGuildChannels lstGuild.ItemData(selectedIndex)
+        MsgBox lstGuild.ItemData(selectedIndex)
+    End If
+End Sub
+
+Private Sub lstChannel_Click()
+    ' Get the selected channel ID
+    Dim selectedIndex As Long
+    selectedIndex = lstChannel.ListIndex
+    
+    If selectedIndex >= 0 Then
+        ' Set the channel ID in the textbox
+        txtCID.Text = lstChannel.ItemData(selectedIndex)
+        
+        ' Fetch messages for this channel
+        FetchChannelMessages txtCID.Text
+    End If
 End Sub
 
 Private Sub ProcessMessagesResponse(aJson As String)
@@ -489,6 +638,8 @@ Private Sub Form_Load()
         
         ' Auto-fetch messages if we have both token and channel
  FetchChannelMessages (txtCID)
+ 
+    FetchUserGuilds
     End If
 End Sub
 
