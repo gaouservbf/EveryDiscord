@@ -11,20 +11,47 @@ Begin VB.Form Form1
    ScaleWidth      =   10215
    StartUpPosition =   3  'Windows Default
    Begin VB.ListBox lstChannel 
-      Height          =   6495
-      Left            =   960
+      BeginProperty Font 
+         Name            =   "Tahoma"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
+      EndProperty
+      Height          =   6105
+      Left            =   1320
       TabIndex        =   6
-      Top             =   0
+      Top             =   360
       Width           =   2175
    End
    Begin VB.ListBox lstGuild 
+      BeginProperty Font 
+         Name            =   "Tahoma"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
+      EndProperty
       Height          =   6495
       Left            =   0
       TabIndex        =   5
       Top             =   0
-      Width           =   975
+      Width           =   1335
    End
    Begin VB.TextBox txtCID 
+      BeginProperty Font 
+         Name            =   "Tahoma"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
+      EndProperty
       Height          =   375
       Left            =   240
       TabIndex        =   3
@@ -33,6 +60,15 @@ Begin VB.Form Form1
       Width           =   7095
    End
    Begin VB.TextBox txtToken 
+      BeginProperty Font 
+         Name            =   "Tahoma"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
+      EndProperty
       Height          =   375
       Left            =   240
       TabIndex        =   2
@@ -42,6 +78,15 @@ Begin VB.Form Form1
       Width           =   7095
    End
    Begin VB.TextBox txtMsg 
+      BeginProperty Font 
+         Name            =   "Tahoma"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
+      EndProperty
       Height          =   375
       Left            =   240
       TabIndex        =   1
@@ -70,11 +115,20 @@ Begin VB.Form Form1
       _Version        =   393216
    End
    Begin VB.ListBox lstMessages 
+      BeginProperty Font 
+         Name            =   "Tahoma"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
+      EndProperty
       Height          =   6495
-      Left            =   3120
+      Left            =   3480
       TabIndex        =   4
       Top             =   0
-      Width           =   7095
+      Width           =   6735
    End
    Begin VB.Menu mnuMessages 
       Caption         =   "Messages"
@@ -94,6 +148,9 @@ Option Explicit
 Private Declare Function SendMessage Lib "user32" Alias "SendMessageW" (ByVal hWnd As Long, ByVal wMsg As Long, ByVal wParam As Long, lParam As Any) As Long
 
 ' TLS Context and Socket variables
+
+Private m_GuildIds() As String
+Private m_ChannelIds() As String
 Private m_uCtx              As UcsTlsContext
 Private m_sRequest          As String
 Private m_sToken            As String
@@ -355,10 +412,12 @@ Private Sub FetchGuildChannels(ByVal sGuildId As String)
 EH:
     MsgBox "Error fetching channels: " & Err.Description, vbCritical
 End Sub
+' Add these declarations at module level
 
 Private Sub ProcessGuildsResponse(aJson As String)
     Dim parsed As ParseResult
     Dim i As Long
+    Dim guildCount As Long
     Dim sjson As String
     
     sjson = Left$(aJson, Len(aJson) - 5)
@@ -372,11 +431,29 @@ Private Sub ProcessGuildsResponse(aJson As String)
     ' Clear existing guilds
     lstGuild.Clear
     
+    ' Count guilds first to properly size the array
+    guildCount = 0
+    For i = 0 To 60
+        On Error Resume Next
+        Dim guildCheck As Object
+        Set guildCheck = parsed.Value(i)
+        If Not guildCheck Is Nothing Then guildCount = guildCount + 1
+        On Error GoTo 0
+    Next i
+    
+    ' Resize the array to match guild count
+    ReDim m_GuildIds(0 To guildCount - 1) As String
+    
     ' Process each guild
-    For i = 0 To 15
+    Dim validGuilds As Long
+    validGuilds = 0
+    
+    For i = 0 To 60
         On Error Resume Next
         Dim guild As Object
         Set guild = parsed.Value(i)
+        
+        ' Skip if no more guilds or error
         
         ' Extract guild details
         Dim sGuildName As String
@@ -384,35 +461,63 @@ Private Sub ProcessGuildsResponse(aJson As String)
         
         sGuildName = guild("name")
         sGuildId = guild("id")
-        MsgBox sGuildId & " " & sGuildName
-        ' Add to listbox with ID as ItemData
+        
+        ' Add to listbox
         lstGuild.AddItem sGuildName
-        lstGuild.ItemData(i) = sGuildId
-
+        ' Store ID in parallel array
+        m_GuildIds(validGuilds) = sGuildId
+        validGuilds = validGuilds + 1
+        
+        ' Debug output
+        Debug.Print "Added guild: " & sGuildName & " with ID: " & sGuildId
     Next i
 End Sub
 
 Private Sub ProcessChannelsResponse(aJson As String)
     Dim parsed As ParseResult
     Dim i As Long
+    Dim channelCount As Long
     Dim sjson As String
-    
+    'MsgBox "hi"
     sjson = Left$(aJson, Len(aJson) - 5)
     ' Parse the JSON array
     parsed = Parse(sjson)
  
     If Not parsed.IsValid Then
+    MsgBox "Oops.. Discord or EveryDiscord gone wrong! " & parsed.Error
         Exit Sub
     End If
     
     ' Clear existing channels
     lstChannel.Clear
     
+    ' Count text channels first
+    channelCount = 0
+    For i = 0 To 60
+        On Error Resume Next
+        Dim channelCheck As Object
+        Set channelCheck = parsed.Value(i)
+        If Not channelCheck Is Nothing Then
+            If channelCheck("type") = 0 Then ' Only count text channels
+                channelCount = channelCount + 1
+            End If
+        End If
+        On Error GoTo 0
+    Next i
+    
+    ' Resize the array to match channel count
+    ReDim m_ChannelIds(0 To channelCount - 1) As String
+    
     ' Process each channel
+    Dim validChannels As Long
+    validChannels = 0
+    
     For i = 0 To 15
         On Error Resume Next
         Dim channel As Object
         Set channel = parsed.Value(i)
+        
+        ' Skip if no more channels
         
         ' Extract channel details
         Dim sChannelName As String
@@ -425,11 +530,52 @@ Private Sub ProcessChannelsResponse(aJson As String)
         
         ' Only add text channels (type 0)
         If lChannelType = 0 Then
-            ' Add to listbox with ID as ItemData
+            ' Add to listbox
             lstChannel.AddItem sChannelName
-            lstChannel.ItemData(lstChannel.NewIndex) = sChannelId
+            ' Store ID in parallel array
+            m_ChannelIds(validChannels) = sChannelId
+            validChannels = validChannels + 1
+            
+            ' Debug output
+            Debug.Print "Added channel: " & sChannelName & " with ID: " & sChannelId
         End If
     Next i
+End Sub
+
+Private Sub lstGuild_Click()
+    ' Get the selected guild ID
+    Dim selectedIndex As Long
+    Dim guildId As String
+    
+    selectedIndex = lstGuild.ListIndex
+    
+    If selectedIndex >= 0 And selectedIndex < UBound(m_GuildIds) + 1 Then
+        ' Get the ID from our parallel array
+        guildId = m_GuildIds(selectedIndex)
+        
+        ' Fetch channels for this guild
+        FetchGuildChannels guildId
+    End If
+End Sub
+
+Private Sub lstChannel_Click()
+    ' Get the selected channel ID
+    Dim selectedIndex As Long
+    Dim channelId As String
+    
+    selectedIndex = lstChannel.ListIndex
+    
+    If selectedIndex >= 0 And selectedIndex < UBound(m_ChannelIds) + 1 Then
+        ' Get the ID from our parallel array
+        channelId = m_ChannelIds(selectedIndex)
+        Debug.Print "Selected channel ID: " & channelId
+        
+        ' Set the channel ID in the textbox
+        txtCID.Text = channelId
+        
+        ' Fetch messages for this channel
+        FetchChannelMessages channelId
+    End If
 End Sub
 
 ' Update the OnDataArrival processing to handle channel responses
@@ -461,32 +607,6 @@ Private Sub ProcessCompleteResponse()
     m_lContentLength = 0
 End Sub
 
-' Add these click event handlers for the listboxes
-Private Sub lstGuild_Click()
-    ' Get the selected guild ID
-    Dim selectedIndex As Long
-    selectedIndex = lstGuild.ListIndex
-    
-    If selectedIndex >= 0 Then
-        ' Fetch channels for this guild
-        FetchGuildChannels lstGuild.ItemData(selectedIndex)
-        MsgBox lstGuild.ItemData(selectedIndex)
-    End If
-End Sub
-
-Private Sub lstChannel_Click()
-    ' Get the selected channel ID
-    Dim selectedIndex As Long
-    selectedIndex = lstChannel.ListIndex
-    
-    If selectedIndex >= 0 Then
-        ' Set the channel ID in the textbox
-        txtCID.Text = lstChannel.ItemData(selectedIndex)
-        
-        ' Fetch messages for this channel
-        FetchChannelMessages txtCID.Text
-    End If
-End Sub
 
 Private Sub ProcessMessagesResponse(aJson As String)
     Dim parsed As ParseResult
@@ -620,11 +740,9 @@ Private Sub Form_Load()
     ' Initialize the form
     m_sBaseUrl = "discord.com"
     
-    
-
-    
-    ' Fetch button
-    
+    ' Initialize arrays
+    ReDim m_GuildIds(0) As String
+    ReDim m_ChannelIds(0) As String
     
     ' Auto load token from settings if available
     If GetSetting("DiscordClient", "Settings", "Token", "") <> "" Then
@@ -637,9 +755,8 @@ Private Sub Form_Load()
         txtCID.Text = GetSetting("DiscordClient", "Settings", "ChannelId", "")
         
         ' Auto-fetch messages if we have both token and channel
- FetchChannelMessages (txtCID)
- 
-    FetchUserGuilds
+        FetchChannelMessages txtCID.Text
+        FetchUserGuilds
     End If
 End Sub
 
