@@ -1,8 +1,0 @@
-Form1 = 44, 58, 672, 528, , 22, 29, 650, 499, C
-cAsyncSocket = 44, 44, 628, 533, 
-Module1 = 0, 0, 0, 0, C
-cHttpDownload = 88, 88, 672, 577, Z
-cRateLimiter = 0, 0, 0, 0, C
-cTlsSocket = 66, 66, 650, 555, 
-mdTlsThunks = 0, 0, 0, 0, C
-cHttpRequest = 0, 0, 0, 0, C

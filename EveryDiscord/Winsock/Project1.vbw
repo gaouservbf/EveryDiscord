@@ -1,8 +1,0 @@
-Form1 = 0, 0, 0, 0, C, 22, 29, 650, 499, C
-ctxWinsock = 0, 0, 0, 0, C, 0, 0, 0, 0, C
-cAsyncSocket = 0, 0, 0, 0, C
-cTlsSocket = 0, 0, 0, 0, C
-mdTlsThunks = 0, 0, 0, 0, C
-cTlsRemaster = 0, 0, 0, 0, C
-frmRemaster = 0, 0, 0, 0, C, 44, 58, 672, 528, C
-cClientCallback = 0, 0, 0, 0, C
