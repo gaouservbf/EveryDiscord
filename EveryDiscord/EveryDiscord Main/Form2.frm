@@ -90,7 +90,11 @@ End Sub
 
 Private Sub Form_Load()
     ' Center the form
-    Me.Move (Screen.Width - Me.Width) / 2, (Screen.Height - Me.Height) / 2
+        If GetSetting("DiscordClient", "Settings", "Token", "") <> "" Then
+Unload Me
+Form1.Show
+    End If
+    'Me.Move (Screen.Width - Me.Width) / 2, (Screen.Height - Me.Height) / 2
     
     ' Set focus to token field
 End Sub

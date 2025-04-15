@@ -10,6 +10,69 @@ Begin VB.Form Form1
    ScaleHeight     =   8055
    ScaleWidth      =   10215
    StartUpPosition =   3  'Windows Default
+   Begin VB.Timer Timer2 
+      Interval        =   2500
+      Left            =   9120
+      Top             =   840
+   End
+   Begin VB.Timer Timer1 
+      Interval        =   5000
+      Left            =   9240
+      Top             =   240
+   End
+   Begin BareboneThunks.GuildView GuildView1 
+      Height          =   6975
+      Left            =   0
+      TabIndex        =   10
+      Top             =   0
+      Width           =   1335
+      _extentx        =   2355
+      _extenty        =   12303
+   End
+   Begin VB.PictureBox Picture1 
+      BorderStyle     =   0  'None
+      Height          =   975
+      Left            =   0
+      ScaleHeight     =   975
+      ScaleWidth      =   2775
+      TabIndex        =   5
+      Top             =   7080
+      Width           =   2775
+      Begin VB.Label Label2 
+         Caption         =   "Status"
+         Height          =   375
+         Left            =   1320
+         TabIndex        =   7
+         Top             =   360
+         Width           =   1455
+      End
+      Begin VB.Label Label1 
+         Caption         =   "Username"
+         BeginProperty Font 
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   700
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
+         EndProperty
+         Height          =   375
+         Left            =   1200
+         TabIndex        =   6
+         Top             =   120
+         Width           =   1575
+      End
+   End
+   Begin BareboneThunks.ChatView ChatView1 
+      Height          =   6975
+      Left            =   3480
+      TabIndex        =   9
+      Top             =   0
+      Width           =   6735
+      _extentx        =   9763
+      _extenty        =   8493
+   End
    Begin VB.ListBox lstChannel 
       BeginProperty Font 
          Name            =   "Tahoma"
@@ -20,27 +83,11 @@ Begin VB.Form Form1
          Italic          =   0   'False
          Strikethrough   =   0   'False
       EndProperty
-      Height          =   6105
-      Left            =   1320
-      TabIndex        =   6
-      Top             =   360
-      Width           =   2175
-   End
-   Begin VB.ListBox lstGuild 
-      BeginProperty Font 
-         Name            =   "Tahoma"
-         Size            =   8.25
-         Charset         =   0
-         Weight          =   400
-         Underline       =   0   'False
-         Italic          =   0   'False
-         Strikethrough   =   0   'False
-      EndProperty
       Height          =   6495
-      Left            =   0
-      TabIndex        =   5
-      Top             =   0
-      Width           =   1335
+      Left            =   1320
+      TabIndex        =   4
+      Top             =   480
+      Width           =   2175
    End
    Begin VB.TextBox txtCID 
       BeginProperty Font 
@@ -53,10 +100,11 @@ Begin VB.Form Form1
          Strikethrough   =   0   'False
       EndProperty
       Height          =   375
-      Left            =   240
+      Left            =   9960
       TabIndex        =   3
       Text            =   "1355226543160557778"
       Top             =   6600
+      Visible         =   0   'False
       Width           =   7095
    End
    Begin VB.TextBox txtToken 
@@ -70,7 +118,7 @@ Begin VB.Form Form1
          Strikethrough   =   0   'False
       EndProperty
       Height          =   375
-      Left            =   240
+      Left            =   9960
       TabIndex        =   2
       Text            =   "Token"
       Top             =   7080
@@ -88,16 +136,10 @@ Begin VB.Form Form1
          Strikethrough   =   0   'False
       EndProperty
       Height          =   375
-      Left            =   240
+      Left            =   2880
       TabIndex        =   1
-      Text            =   "Text1"
       Top             =   7560
-      Width           =   9015
-   End
-   Begin VB.Timer Timer1 
-      Interval        =   5000
-      Left            =   9240
-      Top             =   240
+      Width           =   6375
    End
    Begin VB.CommandButton cmdSendMsg 
       Caption         =   "Send"
@@ -114,21 +156,14 @@ Begin VB.Form Form1
       _ExtentY        =   741
       _Version        =   393216
    End
-   Begin VB.ListBox lstMessages 
-      BeginProperty Font 
-         Name            =   "Tahoma"
-         Size            =   8.25
-         Charset         =   0
-         Weight          =   400
-         Underline       =   0   'False
-         Italic          =   0   'False
-         Strikethrough   =   0   'False
-      EndProperty
-      Height          =   6495
-      Left            =   3480
-      TabIndex        =   4
-      Top             =   0
-      Width           =   6735
+   Begin VB.Label Label3 
+      Alignment       =   2  'Center
+      Caption         =   "Guild Name"
+      Height          =   375
+      Left            =   1320
+      TabIndex        =   8
+      Top             =   120
+      Width           =   2175
    End
    Begin VB.Menu mnuMessages 
       Caption         =   "Messages"
@@ -146,6 +181,8 @@ Attribute VB_Exposed = False
 Option Explicit
 
 Private Declare Function SendMessage Lib "user32" Alias "SendMessageW" (ByVal hWnd As Long, ByVal wMsg As Long, ByVal wParam As Long, lParam As Any) As Long
+
+
 
 ' TLS Context and Socket variables
 
@@ -185,7 +222,168 @@ Private m_sGatewayToken As String
 Private m_sCurrentChannelId As String
 Private WithEvents tmrHeartbeat As Timer
 Attribute tmrHeartbeat.VB_VarHelpID = -1
+' Add these to your declarations section
+Private Type IconRequest
+    GuildId As String
+    IconHash As String
+    guildIndex As Long
+End Type
+
+Private IconRequests() As IconRequest
+Private IconRequestCount As Long
+Private CurrentIconRequest As Long
+Private m_bFetchingIcon As Boolean
+
+' Queue an icon to be fetched
+Private Sub QueueGuildIconFetch(ByVal sGuildId As String, ByVal sIconHash As String, ByVal guildIndex As Long)
+    ' Add this request to our queue
+    ReDim Preserve IconRequests(IconRequestCount)
+    IconRequests(IconRequestCount).GuildId = sGuildId
+    IconRequests(IconRequestCount).IconHash = sIconHash
+    IconRequests(IconRequestCount).guildIndex = guildIndex
+    IconRequestCount = IconRequestCount + 1
+    
+    ' If we're not currently fetching, start the next one
+    If Not m_bFetchingIcon Then
+        FetchNextGuildIcon
+    End If
+End Sub
+
+' Fetch the next icon in the queue
+Private Sub FetchNextGuildIcon()
+    If CurrentIconRequest >= IconRequestCount Then
+        ' All done
+        CurrentIconRequest = 0
+        IconRequestCount = 0
+        ReDim IconRequests(0)
+        m_bFetchingIcon = False
+        Exit Sub
+    End If
+    
+    ' Get the next request
+    Dim req As IconRequest
+    req = IconRequests(CurrentIconRequest)
+    
+    ' Create the API request path for JPG icon (as VB6 can't use PNG)
+    Dim sPath As String
+sPath = "/icons/" & req.GuildId & "/" & req.IconHash & ".jpg?size=80&guality=lossless"
+    
+m_sRequest = "GET /" & sPath & " HTTP/1.1" & vbCrLf & _
+             "Host: cdn.discordapp.com" & vbCrLf & _
+             "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36" & vbCrLf & _
+             "Accept: image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8" & vbCrLf & _
+             "Accept-Language: en-US,en;q=0.9" & vbCrLf & _
+             "Referer: https://discord.com/" & vbCrLf & _
+             "Authorization: " & m_sToken & vbCrLf & _
+             "Connection: close" & vbCrLf & vbCrLf
+
+    ' Set flag to indicate we're fetching an icon
+    m_bFetchingIcon = True
+    
+    ' Connect to Discord CDN
+    Connect "cdn.discordapp.com", 443
+End Sub
+
+' Update the ProcessCompleteResponse function to handle icon responses
+Private Sub ProcessCompleteResponse()
+    ' Check if we're receiving an icon
+    If m_bFetchingIcon Then
+        ProcessIconResponse m_sResponseBuffer
+        m_bFetchingIcon = False
+        
+        ' Move to the next request
+        CurrentIconRequest = CurrentIconRequest + 1
+        FetchNextGuildIcon
+    Else
+        ' Parse HTTP response for regular requests
+        Dim sContent As String
+        sContent = ParseHttpResponse(m_sResponseBuffer)
+    
+        ' For message fetch responses, remove the first line if it exists
+        If InStr(sContent, vbCrLf) > 0 Then
+            sContent = Mid$(sContent, InStr(sContent, vbCrLf) + 2)
+        End If
+        
+        ' Determine what type of response this is and process appropriately
+        If InStr(m_sRequest, "api/v10/channels/") > 0 And InStr(m_sRequest, "/messages") > 0 Then
+            ' This is a channel messages response
+            ProcessMessagesResponse sContent
+        ElseIf InStr(m_sRequest, "api/v10/users/@me/guilds") > 0 Then
+            ' This is a guilds response
+            ProcessGuildsResponse sContent
+        ElseIf InStr(m_sRequest, "api/v10/guilds/") > 0 And InStr(m_sRequest, "/channels") > 0 Then
+            ' This is a channels response
+            ProcessChannelsResponse sContent
+        End If
+    End If
+    
+    ' Reset buffer and flags
+    m_sResponseBuffer = ""
+    m_bReceivingData = False
+    m_lContentLength = 0
+End Sub
+
+Private Sub ProcessIconResponse(ByVal sResponse As String)
+    On Error GoTo EH
+
+    Dim headerEnd As Long
+    Dim tempFile As String
+    Dim isAnimated As Boolean
+
+    ' Detect animated icon via URL
+    isAnimated = (InStr(m_sRequest, "/a_") > 0)
+
+    ' Find end of HTTP headers
+    headerEnd = InStr(sResponse, vbCrLf & vbCrLf)
+
+    If headerEnd > 0 Then
+        Dim binaryData As String
+        binaryData = Mid$(sResponse, headerEnd + 4)
+        
+        ' Use .gif for animated, .jpg otherwise
+        Dim fileExt As String
+        If isAnimated Then
+            fileExt = ".gif"
+        Else
+            fileExt = ".jpg"
+        End If
+        
+        tempFile = Environ$("TEMP") & "\discord_icon_" & Format$(Now, "yyyymmddhhmmss") & fileExt
+
+        ' Save binary image data
+        
+        Dim fileNum As Integer
+        fileNum = FreeFile
+        Open tempFile For Binary As #fileNum
+        Put #fileNum, , binaryData
+        'MsgBox sResponse
+        Close #fileNum
+
+        ' Load into StdPicture (non-animated even if GIF)
+        Dim icon As StdPicture
+        Set icon = LoadPicture(tempFile)
+        
+        ' Update UI
+        If CurrentIconRequest < IconRequestCount Then
+            GuildView1.UpdateGuildIcon IconRequests(CurrentIconRequest).guildIndex, icon
+        End If
+
+        ' Clean up temp
+        Kill tempFile
+    End If
+
+    Exit Sub
+EH:
+    Debug.Print "Error processing icon: " & Err.Description
+End Sub
+
 Function ParseHttpResponse(rawData As String) As String
+    ' For binary data (icons), don't apply text processing
+    If m_bFetchingIcon Then
+        ParseHttpResponse = rawData
+        Exit Function
+    End If
+    
     ' Check if chunked encoding is used
     ' Default: Extract body after headers
     Dim headersEnd As Long
@@ -198,7 +396,7 @@ Function ParseHttpResponse(rawData As String) As String
         responseBody = rawData
     End If
     
-    ' Remove last 3 characters if string is long enough
+    ' Only for text responses, remove last 3 characters if string is long enough
     If Len(responseBody) >= 3 Then
         ParseHttpResponse = Left$(responseBody, Len(responseBody) - 3)
     Else
@@ -225,18 +423,35 @@ Private Sub SendData(baData() As Byte)
     End If
 End Sub
 
+Private Sub Form_Resize()
+ChatView1.Width = Me.ScaleWidth - GuildView1.Width - lstChannel.Width
+End Sub
+
+Private Sub GuildView1_GuildSelected(ByVal Index As Long)
+    Dim SelectedIndex As Long
+    Dim GuildId As String
+    
+    SelectedIndex = Index
+    
+    If SelectedIndex >= 0 And SelectedIndex < UBound(m_GuildIds) + 1 Then
+        ' Get the ID from our parallel array
+        GuildId = m_GuildIds(SelectedIndex)
+        
+        ' Fetch channels for this guild
+        FetchGuildChannels GuildId
+        Label3.Caption = "-" & GuildView1.GetGuildName(Index) & "-"
+    End If
+End Sub
+
 Private Sub Timer1_Timer()
 
-    FetchChannelMessages txtCID.Text
     FetchUserGuilds
 End Sub
 
+
 Private Sub Timer2_Timer()
- If Timer1.Enabled = False Then
- Shape1.BackColor = vbRed
- Else
- Shape1.BackColor = vbGreen
- End If
+
+    FetchChannelMessages txtCID.Text
 End Sub
 
 Private Sub wscSocket_Connect()
@@ -413,11 +628,10 @@ EH:
     MsgBox "Error fetching channels: " & Err.Description, vbCritical
 End Sub
 ' Add these declarations at module level
-
 Private Sub ProcessGuildsResponse(aJson As String)
     Dim parsed As ParseResult
     Dim i As Long
-    Dim guildCount As Long
+    Dim GuildCount As Long
     Dim sjson As String
     
     sjson = Left$(aJson, Len(aJson) - 5)
@@ -429,41 +643,61 @@ Private Sub ProcessGuildsResponse(aJson As String)
     End If
     
     ' Clear existing guilds
-    lstGuild.Clear
+    GuildView1.ClearGuilds
     
     ' Count guilds first to properly size the array
-    guildCount = 0
+    GuildCount = 0
     For i = 0 To 60
         On Error Resume Next
         Dim guildCheck As Object
         Set guildCheck = parsed.Value(i)
-        If Not guildCheck Is Nothing Then guildCount = guildCount + 1
+        If Not guildCheck Is Nothing Then GuildCount = GuildCount + 1
         On Error GoTo 0
     Next i
     
     ' Resize the array to match guild count
-    ReDim m_GuildIds(0 To guildCount - 1) As String
+    ReDim m_GuildIds(0 To GuildCount - 1) As String
     
     ' Process each guild
     Dim validGuilds As Long
     validGuilds = 0
     
-    For i = 0 To 60
+    For i = 1 To 60
         On Error Resume Next
-        Dim guild As Object
-        Set guild = parsed.Value(i)
+        Dim Guild As Object
+        Set Guild = parsed.Value(i)
         
         ' Skip if no more guilds or error
+        If Guild Is Nothing Then
+            Exit For
+        End If
         
         ' Extract guild details
         Dim sGuildName As String
         Dim sGuildId As String
+        Dim sIconHash As String
+        Dim guildIcon As StdPicture
         
-        sGuildName = guild("name")
-        sGuildId = guild("id")
+        sGuildName = Guild("name")
+        sGuildId = Guild("id")
         
-        ' Add to listbox
-        lstGuild.AddItem sGuildName
+        ' Get icon if available
+        On Error Resume Next
+        sIconHash = Guild("icon")
+        On Error GoTo 0
+        
+        ' Add to GuildView with placeholder icon
+        ' You'll need to implement icon fetching in a separate function
+        Set guildIcon = LoadPicture() ' Default empty icon
+        
+        ' If icon hash exists, fetch it
+        If Len(sIconHash) > 0 Then
+            ' Queue icon for fetching (implement this separately)
+            QueueGuildIconFetch sGuildId, sIconHash, validGuilds
+        End If
+        
+        GuildView1.AddGuild sGuildName, guildIcon
+        
         ' Store ID in parallel array
         m_GuildIds(validGuilds) = sGuildId
         validGuilds = validGuilds + 1
@@ -493,7 +727,7 @@ Private Sub ProcessChannelsResponse(aJson As String)
     
     ' Count text channels first
     channelCount = 0
-    For i = 0 To 60
+    For i = 1 To 60
         On Error Resume Next
         Dim channelCheck As Object
         Set channelCheck = parsed.Value(i)
@@ -544,30 +778,19 @@ End Sub
 
 Private Sub lstGuild_Click()
     ' Get the selected guild ID
-    Dim selectedIndex As Long
-    Dim guildId As String
-    
-    selectedIndex = lstGuild.ListIndex
-    
-    If selectedIndex >= 0 And selectedIndex < UBound(m_GuildIds) + 1 Then
-        ' Get the ID from our parallel array
-        guildId = m_GuildIds(selectedIndex)
-        
-        ' Fetch channels for this guild
-        FetchGuildChannels guildId
-    End If
+
 End Sub
 
 Private Sub lstChannel_Click()
     ' Get the selected channel ID
-    Dim selectedIndex As Long
+    Dim SelectedIndex As Long
     Dim channelId As String
     
-    selectedIndex = lstChannel.ListIndex
+    SelectedIndex = lstChannel.ListIndex
     
-    If selectedIndex >= 0 And selectedIndex < UBound(m_ChannelIds) + 1 Then
+    If SelectedIndex >= 0 And SelectedIndex < UBound(m_ChannelIds) + 1 Then
         ' Get the ID from our parallel array
-        channelId = m_ChannelIds(selectedIndex)
+        channelId = m_ChannelIds(SelectedIndex)
         Debug.Print "Selected channel ID: " & channelId
         
         ' Set the channel ID in the textbox
@@ -576,35 +799,6 @@ Private Sub lstChannel_Click()
         ' Fetch messages for this channel
         FetchChannelMessages channelId
     End If
-End Sub
-
-' Update the OnDataArrival processing to handle channel responses
-Private Sub ProcessCompleteResponse()
-    ' Parse HTTP response
-    Dim sContent As String
-    sContent = ParseHttpResponse(m_sResponseBuffer)
-
-    ' For message fetch responses, remove the first line if it exists
-    If InStr(sContent, vbCrLf) > 0 Then
-        sContent = Mid$(sContent, InStr(sContent, vbCrLf) + 2)
-    End If
-    
-    ' Determine what type of response this is and process appropriately
-    If InStr(m_sRequest, "api/v10/channels/") > 0 And InStr(m_sRequest, "/messages") > 0 Then
-        ' This is a channel messages response
-        ProcessMessagesResponse sContent
-    ElseIf InStr(m_sRequest, "api/v10/users/@me/guilds") > 0 Then
-        ' This is a guilds response
-        ProcessGuildsResponse sContent
-    ElseIf InStr(m_sRequest, "api/v10/guilds/") > 0 And InStr(m_sRequest, "/channels") > 0 Then
-        ' This is a channels response
-        ProcessChannelsResponse sContent
-    End If
-    
-    ' Reset buffer and flags
-    m_sResponseBuffer = ""
-    m_bReceivingData = False
-    m_lContentLength = 0
 End Sub
 
 
@@ -627,7 +821,7 @@ Private Sub ProcessMessagesResponse(aJson As String)
     ' Check if we got an array
     
     ' Clear existing messages
-    lstMessages.Clear
+    ChatView1.Clear
     ' Process each message
     For i = 20 To 1 Step -1
     On Error Resume Next
@@ -649,7 +843,7 @@ Private Sub ProcessMessagesResponse(aJson As String)
         sOutput = "[" & sTimestamp & "] " & sAuthor & ": " & sContent
         
         ' Add to listbox
-        lstMessages.AddItem sOutput
+        ChatView1.AddMessage sAuthor, sContent
     Next i
     
 End Sub
@@ -671,10 +865,6 @@ Private Sub cmdFetchMessages_Click()
     SaveSetting "DiscordClient", "Settings", "Token", txtToken.Text
     SaveSetting "DiscordClient", "Settings", "ChannelId", txtCID.Text
     
-    ' Clear result if available
-    If Not txtResult Is Nothing Then
-        txtResult.Text = vbNullString
-    End If
     
     ' Fetch messages
     FetchChannelMessages txtCID.Text
@@ -727,15 +917,14 @@ End Sub
 
 Private Sub OnError(sDescription As String, sSource As String)
     Debug.Print "Critical error: " & sDescription & " in " & sSource, Timer
-    If Not txtResult Is Nothing Then
-        pvAppendLogText txtResult, "Critical error: " & sDescription & " in " & sSource & vbCrLf & vbCrLf
-    Else
+
         MsgBox "Discord API Error: " & sDescription & " in " & sSource, vbCritical
-    End If
+  
 End Sub
 
 '= form events ===========================================================
 
+' In Form_Load, add this initialization
 Private Sub Form_Load()
     ' Initialize the form
     m_sBaseUrl = "discord.com"
@@ -743,6 +932,10 @@ Private Sub Form_Load()
     ' Initialize arrays
     ReDim m_GuildIds(0) As String
     ReDim m_ChannelIds(0) As String
+    ReDim IconRequests(0) As IconRequest
+    IconRequestCount = 0
+    CurrentIconRequest = 0
+    m_bFetchingIcon = False
     
     ' Auto load token from settings if available
     If GetSetting("DiscordClient", "Settings", "Token", "") <> "" Then
@@ -755,11 +948,13 @@ Private Sub Form_Load()
         txtCID.Text = GetSetting("DiscordClient", "Settings", "ChannelId", "")
         
         ' Auto-fetch messages if we have both token and channel
-        FetchChannelMessages txtCID.Text
-        FetchUserGuilds
+        If Len(m_sToken) > 0 Then
+            FetchChannelMessages txtCID.Text
+            FetchUserGuilds
+        End If
     End If
+    
 End Sub
-
 
 Private Sub cmdSendMsg_Click()
     ' Validate inputs
