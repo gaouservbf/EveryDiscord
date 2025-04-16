@@ -12,6 +12,7 @@ UserControl=GuildView.ctl
 IconForm="Form1"
 Startup="Form2"
 HelpFile=""
+Title="Project1"
 ExeName32="Project1.exe"
 Command32=""
 Name="BareboneThunks"

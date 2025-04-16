@@ -26,8 +26,8 @@ Begin VB.Form Form1
       TabIndex        =   10
       Top             =   0
       Width           =   1335
-      _extentx        =   2355
-      _extenty        =   12303
+      _ExtentX        =   2355
+      _ExtentY        =   12303
    End
    Begin VB.PictureBox Picture1 
       BorderStyle     =   0  'None
@@ -70,8 +70,8 @@ Begin VB.Form Form1
       TabIndex        =   9
       Top             =   0
       Width           =   6735
-      _extentx        =   9763
-      _extenty        =   8493
+      _ExtentX        =   9763
+      _ExtentY        =   8493
    End
    Begin VB.ListBox lstChannel 
       BeginProperty Font 
@@ -233,7 +233,18 @@ Private IconRequests() As IconRequest
 Private IconRequestCount As Long
 Private CurrentIconRequest As Long
 Private m_bFetchingIcon As Boolean
+Private Type RequestItem
+    RequestType As String    ' "GuildList", "Channels", "Messages", "Icon", etc.
+    Target As String         ' Guild ID, Channel ID, etc. depending on type
+    Request As String        ' The full HTTP request
+    ExtraData As String      ' Additional data (e.g., Icon hash, index)
+    Index As Long            ' For indexing into arrays if needed
+End Type
 
+Private m_RequestQueue() As RequestItem
+Private m_QueueCount As Long
+Private m_ProcessingRequest As Boolean
+Private m_CurrentRequestType As String
 ' Queue an icon to be fetched
 Private Sub QueueGuildIconFetch(ByVal sGuildId As String, ByVal sIconHash As String, ByVal guildIndex As Long)
     ' Add this request to our queue
