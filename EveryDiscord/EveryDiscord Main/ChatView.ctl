@@ -10,10 +10,10 @@ Begin VB.UserControl ChatView
    ScaleWidth      =   320
    Begin VB.VScrollBar vsbChat 
       Height          =   3495
-      Left            =   4440
+      Left            =   4560
       TabIndex        =   0
       Top             =   0
-      Width           =   375
+      Width           =   255
    End
 End
 Attribute VB_Name = "ChatView"
@@ -73,50 +73,50 @@ End Sub
 
 Private Sub UserControl_Paint()
     Dim i As Long
-    Dim y As Long
+    Dim Y As Long
     Dim AvatarSize As Long: AvatarSize = 32
     Dim Margin As Long: Margin = 8
 
 UserControl.Cls
 
     For i = 0 To MessageCount - 1
-       y = (i - TopIndex) * LineHeight + Margin
+       Y = (i - TopIndex) * LineHeight + Margin
 
-If y + LineHeight > 0 And y < UserControl.ScaleHeight Then
+If Y + LineHeight > 0 And Y < UserControl.ScaleHeight Then
     ' Draw avatar, username, text
     If Not Messages(i).Avatar Is Nothing Then
-        UserControl.PaintPicture Messages(i).Avatar, Margin, y, AvatarSize, AvatarSize
+        UserControl.PaintPicture Messages(i).Avatar, Margin, Y, AvatarSize, AvatarSize
     Else
-        UserControl.Line (Margin, y)-(Margin + AvatarSize, y + AvatarSize), vbGrayText, BF
+        UserControl.Line (Margin, Y)-(Margin + AvatarSize, Y + AvatarSize), vbGrayText, BF
     End If
 
     UserControl.CurrentX = Margin + AvatarSize + 8
-    UserControl.CurrentY = y
+    UserControl.CurrentY = Y
     UserControl.ForeColor = vbBlack
     UserControl.Print Messages(i).Username
 
     UserControl.CurrentX = Margin + AvatarSize + 8
-    UserControl.CurrentY = y + 14
+    UserControl.CurrentY = Y + 14
     UserControl.ForeColor = vbBlack
     UserControl.Print Messages(i).Text
 End If
 
         ' Draw avatar
         If Not Messages(i).Avatar Is Nothing Then
-            UserControl.PaintPicture Messages(i).Avatar, Margin, y, AvatarSize, AvatarSize
+            UserControl.PaintPicture Messages(i).Avatar, Margin, Y, AvatarSize, AvatarSize
         Else
-            UserControl.Line (Margin, y)-(Margin + AvatarSize, y + AvatarSize), vbGrayText, BF
+            UserControl.Line (Margin, Y)-(Margin + AvatarSize, Y + AvatarSize), vbGrayText, BF
         End If
 
         ' Draw username
         UserControl.CurrentX = Margin + AvatarSize + 8
-        UserControl.CurrentY = y
+        UserControl.CurrentY = Y
         UserControl.ForeColor = vbBlack
         UserControl.Print Messages(i).Username
 
         ' Draw text below username
         UserControl.CurrentX = Margin + AvatarSize + 8
-        UserControl.CurrentY = y + 14
+        UserControl.CurrentY = Y + 14
         UserControl.ForeColor = vbBlack
         UserControl.Print Messages(i).Text
     Next i
