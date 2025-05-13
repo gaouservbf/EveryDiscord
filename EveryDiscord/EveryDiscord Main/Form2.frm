@@ -1,26 +1,18 @@
 VERSION 5.00
+Object = "{6B7E6392-850A-101B-AFC0-4210102A8DA7}#1.3#0"; "COMCTL32.OCX"
 Begin VB.Form Form2 
    BorderStyle     =   1  'Fixed Single
    Caption         =   "EveryDiscord"
    ClientHeight    =   7110
    ClientLeft      =   90
    ClientTop       =   435
-   ClientWidth     =   4650
+   ClientWidth     =   4590
    LinkTopic       =   "Form2"
    MaxButton       =   0   'False
    MinButton       =   0   'False
    ScaleHeight     =   7110
-   ScaleWidth      =   4650
+   ScaleWidth      =   4590
    StartUpPosition =   2  'CenterScreen
-   Begin VB.TextBox txtToken 
-      Height          =   375
-      IMEMode         =   3  'DISABLE
-      Left            =   120
-      PasswordChar    =   "*"
-      TabIndex        =   1
-      Top             =   1320
-      Width           =   3495
-   End
    Begin VB.CommandButton btnLogin 
       Caption         =   "Login"
       Height          =   375
@@ -29,13 +21,49 @@ Begin VB.Form Form2
       Top             =   6600
       Width           =   855
    End
-   Begin VB.Label Label1 
-      Caption         =   "Your Discord Token"
-      Height          =   255
-      Left            =   120
+   Begin VB.Frame Frame1 
+      Caption         =   "Via Tokens"
+      Height          =   1455
+      Left            =   240
       TabIndex        =   2
-      Top             =   960
-      Width           =   3495
+      Top             =   1320
+      Width           =   4095
+      Begin VB.TextBox txtToken 
+         Height          =   375
+         IMEMode         =   3  'DISABLE
+         Left            =   120
+         PasswordChar    =   "*"
+         TabIndex        =   3
+         Top             =   600
+         Width           =   3855
+      End
+      Begin VB.Label Label1 
+         Caption         =   "Your Discord Token"
+         Height          =   255
+         Left            =   120
+         TabIndex        =   4
+         Top             =   240
+         Width           =   3495
+      End
+   End
+   Begin ComctlLib.TabStrip TabStrip1 
+      Height          =   5655
+      Left            =   120
+      TabIndex        =   5
+      Top             =   840
+      Width           =   4335
+      _ExtentX        =   7646
+      _ExtentY        =   9975
+      _Version        =   327682
+      BeginProperty Tabs {0713E432-850A-101B-AFC0-4210102A8DA7} 
+         NumTabs         =   1
+         BeginProperty Tab1 {0713F341-850A-101B-AFC0-4210102A8DA7} 
+            Caption         =   "Credentials"
+            Key             =   ""
+            Object.Tag             =   ""
+            ImageVarType    =   2
+         EndProperty
+      EndProperty
    End
    Begin VB.Label Label2 
       Alignment       =   2  'Center
@@ -52,7 +80,7 @@ Begin VB.Form Form2
       EndProperty
       Height          =   615
       Left            =   0
-      TabIndex        =   3
+      TabIndex        =   1
       Top             =   120
       Width           =   4695
    End
