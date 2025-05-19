@@ -225,6 +225,7 @@ End Sub
 
 ' Initialize event
 Private Sub UserControl_Initialize()
+
     SelectedIndex = -1
     HoverIndex = -1
     GuildCount = 0

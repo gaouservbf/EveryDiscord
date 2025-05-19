@@ -7,10 +7,32 @@ Begin VB.Form Form1
    ClientLeft      =   105
    ClientTop       =   555
    ClientWidth     =   10215
+   Icon            =   "Form1.frx":0000
    LinkTopic       =   "Form1"
    ScaleHeight     =   8370
    ScaleWidth      =   10215
    StartUpPosition =   3  'Windows Default
+   Begin VB.CommandButton Command1 
+      Caption         =   "+"
+      BeginProperty Font 
+         Name            =   "Trebuchet MS"
+         Size            =   14.25
+         Charset         =   0
+         Weight          =   700
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
+      EndProperty
+      Height          =   435
+      Left            =   2520
+      TabIndex        =   13
+      Top             =   7560
+      Width           =   435
+   End
+   Begin VB.Timer Timer4 
+      Left            =   2220
+      Top             =   870
+   End
    Begin MSWinsockLib.Winsock wsGuild 
       Left            =   480
       Top             =   3240
@@ -70,8 +92,18 @@ Begin VB.Form Form1
          BeginProperty Panel1 {0713E89F-850A-101B-AFC0-4210102A8DA7} 
             Text            =   "Connecting..."
             TextSave        =   "Connecting..."
+            Key             =   ""
             Object.Tag             =   ""
          EndProperty
+      EndProperty
+      BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
+         Name            =   "Tahoma"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
    End
    Begin MSWinsockLib.Winsock wsGateway 
@@ -101,18 +133,55 @@ Begin VB.Form Form1
       TabIndex        =   5
       Top             =   7080
       Width           =   2775
+      Begin VB.CommandButton Command2 
+         Caption         =   "Config>>"
+         BeginProperty Font 
+            Name            =   "Tahoma"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
+         EndProperty
+         Height          =   330
+         Left            =   1680
+         TabIndex        =   14
+         Top             =   525
+         Width           =   855
+      End
+      Begin VB.PictureBox Picture2 
+         BackColor       =   &H8000000C&
+         BorderStyle     =   0  'None
+         Height          =   555
+         Left            =   630
+         ScaleHeight     =   555
+         ScaleWidth      =   555
+         TabIndex        =   12
+         Top             =   105
+         Width           =   555
+      End
       Begin VB.Label Label2 
          Caption         =   "Status"
+         BeginProperty Font 
+            Name            =   "Tahoma"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
+         EndProperty
          Height          =   375
-         Left            =   1320
+         Left            =   1365
          TabIndex        =   7
-         Top             =   360
+         Top             =   315
          Width           =   1455
       End
       Begin VB.Label Label1 
          Caption         =   "Username"
          BeginProperty Font 
-            Name            =   "MS Sans Serif"
+            Name            =   "Tahoma"
             Size            =   8.25
             Charset         =   0
             Weight          =   700
@@ -197,6 +266,15 @@ Begin VB.Form Form1
    End
    Begin VB.CommandButton cmdSendMsg 
       Caption         =   "Send"
+      BeginProperty Font 
+         Name            =   "Tahoma"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
+      EndProperty
       Height          =   375
       Left            =   9360
       TabIndex        =   0
@@ -218,8 +296,8 @@ Begin VB.Form Form1
       TabIndex        =   9
       Top             =   0
       Width           =   6735
-      _ExtentX        =   9763
-      _ExtentY        =   8493
+      _extentx        =   9763
+      _extenty        =   8493
    End
    Begin MSWinsockLib.Winsock wsGuildIcon 
       Index           =   1
@@ -245,8 +323,8 @@ Begin VB.Form Form1
       TabIndex        =   10
       Top             =   0
       Width           =   1335
-      _ExtentX        =   2355
-      _ExtentY        =   12303
+      _extentx        =   2355
+      _extenty        =   12303
    End
    Begin MSWinsockLib.Winsock wsMessage 
       Left            =   0
@@ -258,6 +336,15 @@ Begin VB.Form Form1
    Begin VB.Label Label3 
       Alignment       =   2  'Center
       Caption         =   "Guild Name"
+      BeginProperty Font 
+         Name            =   "Tahoma"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
+      EndProperty
       Height          =   375
       Left            =   1320
       TabIndex        =   8
@@ -281,22 +368,7 @@ Option Explicit
 
 Private Declare Function SendMessage Lib "user32" Alias "SendMessageW" (ByVal hWnd As Long, ByVal wMsg As Long, ByVal wParam As Long, lParam As Any) As Long
 
-Private m_uCtx() As UcsTlsContext
-Private m_sRequest() As String
-Private m_sResponseBuffer() As String
-Private m_bReceivingData() As Boolean
-Private m_lContentLength() As Long
-Private m_CurrentRequestType() As String
-Private m_bFetchingIcon() As Boolean
-Private m_MaxSockets As Long
-Private m_ActiveSockets As Long
-
-' TLS Context and Socket variables
-Private m_GuildIds() As String
-Private m_ChannelIds() As String
-Private m_sToken As String
-Private m_sBaseUrl As String
-
+' Add this as a module or class-level variable
 
 ' WebSocket Control needed for Gateway connection
 
@@ -305,6 +377,32 @@ Private Const DISCORD_GATEWAY_URL As String = "gateway.discord.gg"
 Private Const DISCORD_GATEWAY_VERSION As String = "10"
 Private Const DISCORD_GATEWAY_PORT As Long = 443
 
+Private m_lFreeSocketIndex As Long     ' Next available socket index
+
+' Control array constants
+Private Const MAX_CONNECTIONS As Long = 255
+Private Const SOCKET_IDLE As Long = 0
+Private Const SOCKET_CONNECTING As Long = 1
+Private Const SOCKET_CONNECTED As Long = 2
+Private Const SOCKET_RECEIVING As Long = 3
+
+' TLS Context and Socket variables
+Private m_GuildIds() As String
+Private m_ChannelIds() As String
+Private m_uCtx() As UcsTlsContext      ' Array of TLS contexts
+Private m_sRequest() As String         ' Array of requests
+Private m_sToken As String
+Private m_sBaseUrl As String
+
+' Socket state tracking
+Private m_lSocketState() As Long       ' State of each socket
+Private m_sResponseBuffer() As String  ' Response buffer for each socket
+Private m_lContentLength() As Long     ' Content length for each socket
+Private m_bReceivingData() As Boolean  ' Receiving flag for each socket
+Private m_RequestType() As String      ' Request type for each socket
+Private m_ExtraData() As String        ' Extra data for each socket
+Private m_Index() As Long              ' Index for each socket
+Private m_Target() As String           ' Target for each socket
 
 ' Gateway state tracking
 Private m_sSessionId As String
@@ -320,7 +418,7 @@ Attribute tmrHeartbeat.VB_VarHelpID = -1
 
 ' Add these to your declarations section
 Private Type IconRequest
-    guildId As String
+    GuildId As String
     iconHash As String
     guildIndex As Long
 End Type
@@ -328,23 +426,206 @@ End Type
 Private IconRequests() As IconRequest
 Private IconRequestCount As Long
 Private CurrentIconRequest As Long
+Private m_bFetchingIcon As Boolean
 
 Private Type RequestItem
-    requestType As String    ' "GuildList", "Channels", "Messages", "Icon", etc.
-    target As String         ' Guild ID, Channel ID, etc. depending on type
-    request As String        ' The full HTTP request
-    extraData As String      ' Additional data (e.g., Icon hash, index)
+    RequestType As String    ' "GuildList", "Channels", "Messages", "Icon", etc.
+    Target As String         ' Guild ID, Channel ID, etc. depending on type
+    Request As String        ' The full HTTP request
+    ExtraData As String      ' Additional data (e.g., Icon hash, index)
     Index As Long            ' For indexing into arrays if needed
 End Type
 
 Private m_RequestQueue() As RequestItem
 Private m_QueueCount As Long
 Private m_ProcessingRequest As Boolean
+Private m_CurrentRequestType As String
 Private m_GatewayBuffer As String
 
-Function ParseHttpResponse(rawData As String, ByVal socketIndex As Long) As String
+
+Private Sub Connect(ByVal socketIndex As Long, ByVal sServer As String, ByVal lPort As Long)
+    If socketIndex < 0 Or socketIndex >= MAX_CONNECTIONS Then
+        Exit Sub  ' Invalid index
+    End If
+    
+    ' Initialize TLS context for this connection
+    Call TlsInitClient(m_uCtx(socketIndex), sServer)
+    
+    ' Close socket if already connected
+    If m_lSocketState(socketIndex) <> SOCKET_IDLE Then
+        wscSocket(socketIndex).Close
+    End If
+    
+    ' Set state and connect
+    m_lSocketState(socketIndex) = SOCKET_CONNECTING
+    wscSocket(socketIndex).Connect sServer, lPort
+End Sub
+Private Sub SendData(ByVal socketIndex As Long, baData() As Byte)
+    Dim baOutput() As Byte
+    Dim lOutputPos As Long
+    
+    If socketIndex < 0 Or socketIndex >= MAX_CONNECTIONS Then
+        Exit Sub  ' Invalid index
+    End If
+    
+    If Not TlsSend(m_uCtx(socketIndex), baData, UBound(baData) + 1, baOutput, lOutputPos) Then
+        OnError TlsGetLastError(m_uCtx(socketIndex)), "TlsSend", socketIndex
+    End If
+    
+    If lOutputPos > 0 Then
+        Debug.Assert UBound(baOutput) + 1 = lOutputPos
+        wscSocket(socketIndex).SendData baOutput
+    End If
+End Sub
+
+Private Sub Form_Resize()
+    ChatView1.Width = Me.ScaleWidth - GuildView1.Width - lstChannel.Width
+End Sub
+
+Private Sub GuildView1_GuildSelected(ByVal Index As Long)
+    Dim SelectedIndex As Long
+    Dim GuildId As String
+    
+    SelectedIndex = Index
+    
+    If SelectedIndex >= 0 And SelectedIndex < UBound(m_GuildIds) + 1 Then
+        ' Get the ID from our parallel array
+        GuildId = m_GuildIds(SelectedIndex)
+        
+        ' Fetch channels for this guild
+        FetchGuildChannels GuildId
+        Label3.Caption = "<" & GuildView1.GetGuildName(Index) & ">"
+        Me.Caption = "EveryDiscord - " & GuildView1.GetGuildName(Index)
+    End If
+End Sub
+
+Private Sub Timer1_Timer()
+   ' FetchUserGuilds
+End Sub
+
+Private Sub Timer2_Timer()
+    'FetchChannelMessages txtCID.Text
+End Sub
+
+Private Sub wscSocket_Connect(Index As Integer)
+    Dim baEmpty() As Byte
+    Dim baOutput() As Byte
+    Dim lOutputPos As Long
+    
+    On Error GoTo EH
+    
+    ' Update state
+    m_lSocketState(Index) = SOCKET_CONNECTED
+    
+    ' Begin TLS handshake
+    If Not TlsHandshake(m_uCtx(Index), baEmpty, -1, baOutput, lOutputPos) Then
+        OnError TlsGetLastError(m_uCtx(Index)), "TlsHandshake", Index
+    End If
+    
+    If lOutputPos > 0 Then
+        Debug.Assert UBound(baOutput) + 1 = lOutputPos
+        wscSocket(Index).SendData baOutput
+    End If
+    
+    Exit Sub
+EH:
+    OnError Err.Description, "wscSocket_Connect", Index
+End Sub
+
+
+Private Sub wscSocket_DataArrival(Index As Integer, ByVal bytesTotal As Long)
+    On Error Resume Next
+    
+    Dim bError As Boolean
+    Dim baRecv() As Byte
+    Dim baOutput() As Byte
+    Dim lOutputPos As Long
+    Dim baPlainText() As Byte
+    Dim lSize As Long
+    
+    If TlsIsClosed(m_uCtx(Index)) Or bytesTotal = 0 Then
+        Exit Sub
+    End If
+    
+    ' Get received data
+    wscSocket(Index).GetData baRecv
+    
+    ' Handle TLS handshake if not ready
+    If Not TlsIsReady(m_uCtx(Index)) Then
+        lOutputPos = 0
+        bError = Not TlsHandshake(m_uCtx(Index), baRecv, -1, baOutput, lOutputPos)
+        
+        If lOutputPos > 0 Then
+            Debug.Assert UBound(baOutput) + 1 = lOutputPos
+            wscSocket(Index).SendData baOutput
+        End If
+        
+        If bError Then
+            OnError TlsGetLastError(m_uCtx(Index)), "TlsHandshake", Index
+        End If
+        
+        If Not TlsIsReady(m_uCtx(Index)) Then
+            Exit Sub
+        End If
+        
+        ' Connection established, send request
+        OnConnect Index
+        
+        ' Fall through to process any remaining data
+        Erase baRecv
+    End If
+    
+    ' Process data
+    lOutputPos = 0
+    bError = Not TlsReceive(m_uCtx(Index), baRecv, -1, baPlainText, lSize, baOutput, lOutputPos)
+    
+    If lOutputPos > 0 Then
+        wscSocket(Index).SendData baOutput
+    End If
+    
+    If lSize > 0 Then
+        OnDataArrival Index, lSize, baPlainText
+    End If
+    
+    If bError Then
+        OnError TlsGetLastError(m_uCtx(Index)), "TlsReceive", Index
+    End If
+    
+    If TlsIsClosed(m_uCtx(Index)) Then
+        OnClose Index
+    End If
+End Sub
+Private Sub wscSocket_Close(Index As Integer)
+    If Not TlsIsClosed(m_uCtx(Index)) Then
+        OnClose Index
+    End If
+End Sub
+
+' Heartbeat timer
+Private Sub tmrHeartbeat_Timer()
+    
+End Sub
+
+' Add this to Form_Unload
+Private Sub Form_Unload(Cancel As Integer)
+    ' Clean up WebSocket and timers
+    If Not wsGateway Is Nothing Then
+        wsGateway.Close
+    End If
+    
+    If Not tmrHeartbeat Is Nothing Then
+        tmrHeartbeat.Enabled = False
+        Set tmrHeartbeat = Nothing
+    End If
+End Sub
+' Called when socket connected and TLS handshake completed
+Private Sub OnConnect(ByVal socketIndex As Long)
+    ' Send HTTP request
+    SendData socketIndex, StrConv(m_sRequest(socketIndex), vbFromUnicode)
+End Sub
+Function ParseHttpResponse(rawData As String, bFetchingIcon As Boolean) As String
     ' For binary data (icons), don't apply text processing
-    If m_bFetchingIcon(socketIndex) Then
+    If bFetchingIcon Then
         ParseHttpResponse = rawData
         Exit Function
     End If
@@ -361,7 +642,7 @@ Function ParseHttpResponse(rawData As String, ByVal socketIndex As Long) As Stri
         responseBody = rawData
     End If
     
-    ' Only for text responses, remove last 3 characters if string is long enough
+    ' Only for text responses, remove last characters if string is long enough
     If Len(responseBody) >= 3 Then
         ParseHttpResponse = Left$(responseBody, Len(responseBody) - 3)
     Else
@@ -369,184 +650,6 @@ Function ParseHttpResponse(rawData As String, ByVal socketIndex As Long) As Stri
     End If
 End Function
 
-Private Function Connect(ByVal sServer As String, ByVal lPort As Long, ByVal sRequestType As String, ByVal sRequest As String, Optional ByVal bFetchingIcon As Boolean = False) As Long
-    Dim socketIndex As Long
-    
-    ' Find an available socket
-    socketIndex = GetAvailableSocket()
-    
-    If socketIndex = 0 Then
-        ' No sockets available, return error
-        Connect = 0
-        Exit Function
-    End If
-    
-    ' Initialize the TLS context for this socket
-    Call TlsInitClient(m_uCtx(socketIndex), sServer)
-    
-    ' Store request information
-    m_sRequest(socketIndex) = sRequest
-    m_CurrentRequestType(socketIndex) = sRequestType
-    m_bFetchingIcon(socketIndex) = bFetchingIcon
-    m_bReceivingData(socketIndex) = False
-    m_sResponseBuffer(socketIndex) = ""
-    m_lContentLength(socketIndex) = 0
-    
-    ' Connect the socket
-    wscSocket(socketIndex).Close
-    wscSocket(socketIndex).Connect sServer, lPort
-    
-    ' Return the socket index for reference
-    Connect = socketIndex
-End Function
-
-Private Sub Form_Resize()
-    ChatView1.Width = Me.ScaleWidth - GuildView1.Width - lstChannel.Width
-End Sub
-
-Private Sub GuildView1_GuildSelected(ByVal Index As Long)
-    Dim SelectedIndex As Long
-    Dim guildId As String
-    
-    SelectedIndex = Index
-    
-    If SelectedIndex >= 0 And SelectedIndex < UBound(m_GuildIds) + 1 Then
-        ' Get the ID from our parallel array
-        guildId = m_GuildIds(SelectedIndex)
-        
-        ' Fetch channels for this guild
-        FetchGuildChannels guildId
-        Label3.Caption = "-" & GuildView1.GetGuildName(Index) & "-"
-    End If
-End Sub
-
-' Find an available socket index
-Private Function GetAvailableSocket() As Long
-    Dim i As Long
-    
-    ' First try to find a closed socket
-    For i = 1 To m_MaxSockets
-        If wscSocket(i).State = 0 Then ' sckClosed
-            GetAvailableSocket = i
-            Exit Function
-        End If
-    Next i
-    
-    ' All sockets are in use
-    GetAvailableSocket = 0
-End Function
-
-' Modified SendData function to use socket array
-Private Sub SendData(ByVal socketIndex As Long, baData() As Byte)
-    Dim baOutput() As Byte
-    Dim lOutputPos As Long
-    
-    If socketIndex <= 0 Or socketIndex > m_MaxSockets Then Exit Sub
-    
-    If Not TlsSend(m_uCtx(socketIndex), baData, UBound(baData) + 1, baOutput, lOutputPos) Then
-        OnError TlsGetLastError(m_uCtx(socketIndex)), "TlsSend", socketIndex
-    End If
-    If lOutputPos > 0 Then
-        Debug.Assert UBound(baOutput) + 1 = lOutputPos
-        wscSocket(socketIndex).SendData baOutput
-    End If
-End Sub
-
-Private Sub Timer3_Timer()
-FetchUserGuilds
-End Sub
-
-' Updated connect event
-Private Sub wscSocket_Connect(Index As Integer)
-    Dim baEmpty() As Byte
-    Dim baOutput() As Byte
-    Dim lOutputPos As Long
-    
-    On Error GoTo EH
-    If Not TlsHandshake(m_uCtx(Index), baEmpty, -1, baOutput, lOutputPos) Then
-        OnError TlsGetLastError(m_uCtx(Index)), "TlsHandshake", Index
-    End If
-    If lOutputPos > 0 Then
-        Debug.Assert UBound(baOutput) + 1 = lOutputPos
-        wscSocket(Index).SendData baOutput
-    End If
-    Exit Sub
-EH:
-    OnError Err.Description, "wscSocket_Connect", Index
-End Sub
-
-' Updated data arrival event
-Private Sub wscSocket_DataArrival(Index As Integer, ByVal bytesTotal As Long)
-On Error Resume Next
-    Dim bError As Boolean
-    Dim baRecv() As Byte
-    Dim baOutput() As Byte
-    Dim lOutputPos As Long
-    Dim baPlainText() As Byte
-    Dim lSize As Long
-    
-    If TlsIsClosed(m_uCtx(Index)) Or bytesTotal = 0 Then
-        Exit Sub
-    End If
-    wscSocket(Index).GetData baRecv
-    If Not TlsIsReady(m_uCtx(Index)) Then
-        lOutputPos = 0
-        bError = Not TlsHandshake(m_uCtx(Index), baRecv, -1, baOutput, lOutputPos)
-        If lOutputPos > 0 Then
-            Debug.Assert UBound(baOutput) + 1 = lOutputPos
-            wscSocket(Index).SendData baOutput
-        End If
-        If bError Then
-            OnError TlsGetLastError(m_uCtx(Index)), "TlsHandshake", Index
-        End If
-        If Not TlsIsReady(m_uCtx(Index)) Then
-            Exit Sub
-        End If
-        OnConnect Index
-        '--- fall-through to flush application data after TLS handshake (if any)
-        Erase baRecv
-    End If
-    lOutputPos = 0
-    bError = Not TlsReceive(m_uCtx(Index), baRecv, -1, baPlainText, lSize, baOutput, lOutputPos)
-    If lOutputPos > 0 Then
-        wscSocket(Index).SendData baOutput
-    End If
-    If lSize > 0 Then
-        OnDataArrival Index, lSize, baPlainText
-    End If
-    If bError Then
-        OnError TlsGetLastError(m_uCtx(Index)), "TlsReceive", Index
-    End If
-    If TlsIsClosed(m_uCtx(Index)) Then
-        OnClose Index
-    End If
-    Exit Sub
-End Sub
-
-' Updated close event
-Private Sub wscSocket_Close(Index As Integer)
-    If Not TlsIsClosed(m_uCtx(Index)) Then
-        OnClose Index
-    End If
-End Sub
-' Add this to Form_Unload
-Private Sub Form_Unload(Cancel As Integer)
-    ' Clean up WebSocket and timers
-    If Not wsGateway Is Nothing Then
-        wsGateway.Close
-    End If
-    
-    If Not tmrHeartbeat Is Nothing Then
-        tmrHeartbeat.Enabled = False
-        Set tmrHeartbeat = Nothing
-    End If
-End Sub
-
-'= callbacks =============================================================
-
-Private Sub OnConnect(ByVal socketIndex As Long)
-    SendData socketIndex, StrConv(m_sRequest(socketIndex), vbFromUnicode)
-End Sub
 
 Private Sub OnDataArrival(ByVal socketIndex As Long, ByVal bytesTotal As Long, baData() As Byte)
     Debug.Print "OnDataArrival, Socket=" & socketIndex & ", bytesTotal=" & bytesTotal, Timer
@@ -586,22 +689,114 @@ Private Sub OnDataArrival(ByVal socketIndex As Long, ByVal bytesTotal As Long, b
         ' For chunked encoding, check for final chunk
         If InStr(1, m_sResponseBuffer(socketIndex), "Transfer-Encoding: chunked", vbTextCompare) > 0 Then
             If InStr(m_sResponseBuffer(socketIndex), vbCrLf & "0" & vbCrLf & vbCrLf) > 0 Then
-                ProcessCompleteResponse socketIndex
+                ProcessHttpResponse socketIndex
             End If
         ' For Content-Length, check if we've received enough data
         ElseIf m_lContentLength(socketIndex) > 0 Then
             If contentReceived >= m_lContentLength(socketIndex) Then
-                ProcessCompleteResponse socketIndex
+                ProcessHttpResponse socketIndex
             End If
         ' If we can't determine length, assume this is all we'll get
         Else
-            ProcessCompleteResponse socketIndex
+            ProcessHttpResponse socketIndex
         End If
     End If
 End Sub
+Private Sub ResetSocket(ByVal socketIndex As Long)
+    ' Skip if invalid index
+    If socketIndex < 0 Or socketIndex >= MAX_CONNECTIONS Then
+        Exit Sub
+    End If
+    
+    ' Close the socket
+    wscSocket(socketIndex).Close
+    
+    ' Reset state and buffers
+    m_lSocketState(socketIndex) = SOCKET_IDLE
+    m_sResponseBuffer(socketIndex) = ""
+    m_lContentLength(socketIndex) = 0
+    m_bReceivingData(socketIndex) = False
+    m_RequestType(socketIndex) = ""
+    m_ExtraData(socketIndex) = ""
+    m_Index(socketIndex) = -1
+    m_Target(socketIndex) = ""
+End Sub
 
-' Add these declarations at module level
+' Called when socket closed
+Private Sub ProcessHttpResponse(ByVal socketIndex As Long)
+    Dim sResponse As String
+    Dim bFetchingIcon As Boolean
+    
+    ' Skip if invalid index
+    If socketIndex < 0 Or socketIndex >= MAX_CONNECTIONS Then
+        Exit Sub
+    End If
+    
+    ' Get response from buffer
+    sResponse = m_sResponseBuffer(socketIndex)
+    
+    ' Check if this is an icon request
+    bFetchingIcon = (m_RequestType(socketIndex) = "Icon")
+    
+    ' Process based on request type
+    Select Case m_RequestType(socketIndex)
+        Case "Icon"
+            ProcessIconResponse socketIndex, sResponse
+            
+        Case "GuildList"
+            Dim sContent As String
+            sContent = ParseHttpResponse(sResponse, bFetchingIcon)
+            If InStr(sContent, vbCrLf) > 0 Then
+                sContent = Mid$(sContent, InStr(sContent, vbCrLf) + 2)
+            End If
+            ProcessGuildsResponse sContent
+            
+        Case "Channels"
+            Dim sChannelContent As String
+            sChannelContent = ParseHttpResponse(sResponse, bFetchingIcon)
+            If InStr(sChannelContent, vbCrLf) > 0 Then
+                sChannelContent = Mid$(sChannelContent, InStr(sChannelContent, vbCrLf) + 2)
+            End If
+            ProcessChannelsResponse sChannelContent
+            
+        Case "Messages"
+            Dim sMessageContent As String
+            sMessageContent = ParseHttpResponse(sResponse, bFetchingIcon)
+            If InStr(sMessageContent, vbCrLf) > 0 Then
+                sMessageContent = Mid$(sMessageContent, InStr(sMessageContent, vbCrLf) + 2)
+            End If
+            ProcessMessagesResponse sMessageContent
+            
+        Case "SendMessage"
+            ' No special handling needed for sent messages
+            ' You could add code to refresh messages in current channel
+            
+        Case Else
+            ' Unknown request type
+            Debug.Print "Unknown request type: " & m_RequestType(socketIndex)
+    End Select
+    
+    ' Reset socket state and buffers
+    ResetSocket socketIndex
+End Sub
+
+Private Sub OnClose(ByVal socketIndex As Long)
+    Debug.Print "OnClose, Socket=" & socketIndex, Timer
+    If Len(m_sResponseBuffer(socketIndex)) > 0 Then
+        ProcessHttpResponse socketIndex
+    Else
+        ResetSocket socketIndex
+    End If
+    DequeueAndProcessNext ' Add this to trigger next request
+End Sub
+' Called on socket or TLS error
+Private Sub OnError(sDescription As String, sSource As String, socketIndex As Variant)
+    Debug.Print "Critical error: " & sDescription & " in " & sSource & ", Socket=" & socketIndex, Timer
+    MsgBox "Discord API Error: " & sDescription & " in " & sSource, vbCritical
+    ResetSocket socketIndex
+End Sub
 Private Sub ProcessGuildsResponse(aJson As String)
+
     Dim parsed As ParseResult
     Dim i As Long
     Dim GuildCount As Long
@@ -614,13 +809,13 @@ Private Sub ProcessGuildsResponse(aJson As String)
     If Not parsed.IsValid Then
         Exit Sub
     End If
-    
     ' Clear existing guilds
     GuildView1.ClearGuilds
-    MsgBox UBound(parsed.Value)
+    
+GuildView1.AddGuild "DMs", LoadPicture(App.Path & "\everydiscord.gif")
     ' Count guilds first to properly size the array
     GuildCount = 0
-    For i = 0 To UBound(parsed.Value)
+    For i = 0 To parsed.Value.Count
         On Error Resume Next
         Dim guildCheck As Object
         Set guildCheck = parsed.Value(i)
@@ -635,7 +830,7 @@ Private Sub ProcessGuildsResponse(aJson As String)
     Dim validGuilds As Long
     validGuilds = 0
     
-    For i = 1 To UBound(parsed.Value)
+    For i = 1 To parsed.Value.Count
         On Error Resume Next
         Dim Guild As Object
         Set Guild = parsed.Value(i)
@@ -679,41 +874,35 @@ Private Sub ProcessGuildsResponse(aJson As String)
         Debug.Print "Added guild: " & sGuildName & " with ID: " & sGuildId
     Next i
 End Sub
-
 Private Sub ProcessChannelsResponse(aJson As String)
     Dim parsed As ParseResult
     Dim i As Long
     Dim channelCount As Long
     Dim sjson As String
-    'MsgBox "hi"
-    sjson = Left$(aJson, Len(aJson) - 5)
+    Dim validChannels As Long
+    ' Clean up the JSON input string - remove trailing characters if present
+    If Len(aJson) > 5 Then
+        sjson = Left$(aJson, Len(aJson) - 5)
+    Else
+        sjson = aJson
+    End If
+    
     ' Parse the JSON array
     parsed = Parse(sjson)
  
     If Not parsed.IsValid Then
-    MsgBox "Oops.. Discord or EveryDiscord gone wrong! " & parsed.Error
+        MsgBox "Error parsing channel data: " & parsed.Error, vbExclamation
         Exit Sub
     End If
     
     ' Clear existing channels
     lstChannel.Clear
-    
-    ' Count text channels first
-    channelCount = 0
-    
-    ' Resize the array to match channel count
-    ReDim m_ChannelIds(0 To channelCount - 1) As String
-    
-    ' Process each channel
-    Dim validChannels As Long
-    validChannels = 0
-    
-    For i = 0 To 15
+ 
+    For i = 1 To parsed.Value.Count  ' Increased to handle larger guilds
         On Error Resume Next
         Dim channel As Object
         Set channel = parsed.Value(i)
         
-        ' Skip if no more channels
         
         ' Extract channel details
         Dim sChannelName As String
@@ -728,14 +917,23 @@ Private Sub ProcessChannelsResponse(aJson As String)
         If lChannelType = 0 Then
             ' Add to listbox
             lstChannel.AddItem sChannelName
-            ' Store ID in parallel array
-            m_ChannelIds(validChannels) = sChannelId
-            validChannels = validChannels + 1
             
-            ' Debug output
-            Debug.Print "Added channel: " & sChannelName & " with ID: " & sChannelId
+            ' Store ID in parallel array (check bounds first)
+            If validChannels <= UBound(m_ChannelIds) Then
+                m_ChannelIds(validChannels) = sChannelId
+                validChannels = validChannels + 1
+                
+                ' Debug output
+                Debug.Print "Added channel: " & sChannelName & " with ID: " & sChannelId
+            End If
         End If
+        On Error GoTo 0
     Next i
+    
+    ' If we found channels, select the first one
+    If lstChannel.ListCount > 0 Then
+        lstChannel.ListIndex = 0
+    End If
 End Sub
 
 Private Sub lstGuild_Click()
@@ -746,7 +944,7 @@ Private Sub lstChannel_Click()
     ' Get the selected channel ID
     Dim SelectedIndex As Long
     Dim channelId As String
-    
+    MsgBox lstChannel.ListIndex
     SelectedIndex = lstChannel.ListIndex
     
     If SelectedIndex >= 0 And SelectedIndex < UBound(m_ChannelIds) + 1 Then
@@ -865,47 +1063,20 @@ Private Function FormatDiscordTimestamp(sTimestamp As String) As String
     End If
 End Function
 
-' Updated OnClose to use socket index
-Private Sub OnClose(ByVal socketIndex As Long)
-    Debug.Print "OnClose Socket=" & socketIndex, Timer
-End Sub
 
-' Updated OnError to use socket index
-Private Sub OnError(sDescription As String, sSource As String, ByVal socketIndex As Long)
-    Debug.Print "Critical error on Socket " & socketIndex & ": " & sDescription & " in " & sSource, Timer
-    MsgBox "Discord API Error on Socket " & socketIndex & ": " & sDescription & " in " & sSource, vbCritical
-End Sub
-Private Sub InitializeSocketArray()
-    m_MaxSockets = 255
-    
-    ' Initialize arrays
-    ReDim m_uCtx(1 To m_MaxSockets) As UcsTlsContext
-    ReDim m_sRequest(1 To m_MaxSockets) As String
-    ReDim m_sResponseBuffer(1 To m_MaxSockets) As String
-    ReDim m_bReceivingData(1 To m_MaxSockets) As Boolean
-    ReDim m_lContentLength(1 To m_MaxSockets) As Long
-    ReDim m_CurrentRequestType(1 To m_MaxSockets) As String
-    ReDim m_bFetchingIcon(1 To m_MaxSockets) As Boolean
-    
-    ' Create the Winsock controls dynamically
-    Dim i As Long
-    For i = 1 To m_MaxSockets
-        Load wscSocket(i)
-    Next i
-    
-    m_ActiveSockets = 0
-End Sub
-' Updated Form_Load to initialize socket array
+
+' Form initialization
 Private Sub Form_Load()
     ' Initialize the form
     m_sBaseUrl = "discord.com"
     
-    ' Initialize arrays
+    ' Initialize socket control array and related arrays
+    InitializeSocketArray
+    
+    ' Initialize guild and channel arrays
     ReDim m_GuildIds(0) As String
     ReDim m_ChannelIds(0) As String
     
-    
-    InitializeSocketArray
     ' Auto load token from settings if available
     If GetSetting("DiscordClient", "Settings", "Token", "") <> "" Then
         txtToken.Text = GetSetting("DiscordClient", "Settings", "Token", "")
@@ -924,8 +1095,83 @@ Private Sub Form_Load()
     End If
 End Sub
 
+Private Sub InitializeSocketArray()
+    Dim i As Integer
+    
+    ReDim m_uCtx(0 To MAX_CONNECTIONS - 1)
+    ReDim m_sRequest(0 To MAX_CONNECTIONS - 1)
+    ReDim m_lSocketState(0 To MAX_CONNECTIONS - 1)
+    ReDim m_sResponseBuffer(0 To MAX_CONNECTIONS - 1)
+    ReDim m_lContentLength(0 To MAX_CONNECTIONS - 1)
+    ReDim m_bReceivingData(0 To MAX_CONNECTIONS - 1)
+    ReDim m_RequestType(0 To MAX_CONNECTIONS - 1)
+    ReDim m_ExtraData(0 To MAX_CONNECTIONS - 1)
+    ReDim m_Index(0 To MAX_CONNECTIONS - 1)
+    ReDim m_Target(0 To MAX_CONNECTIONS - 1)
+    
+    ' Initialize each Winsock control
+    For i = 0 To MAX_CONNECTIONS - 1  ' Start from 0, not 1
+        If i > 0 Then Load wscSocket(i)  ' Only load if not the base control
+        
+        ' Set initial state
+        m_lSocketState(i) = SOCKET_IDLE
+        m_sResponseBuffer(i) = ""
+        m_lContentLength(i) = 0
+        m_bReceivingData(i) = False
+        m_RequestType(i) = ""
+        m_ExtraData(i) = ""
+        m_Index(i) = i  ' Store the actual index
+        m_Target(i) = ""
+    Next i
+    
+    ' Set initial free socket index
+    m_lFreeSocketIndex = 0
+End Sub
+Private Sub ProcessNextQueuedRequest()
+    Dim socketIndex As Long
+    
+If m_QueueCount = 0 Then
+    Exit Sub
+End If
+    ' Find a free socket
+    socketIndex = GetFreeSocketIndex()
+    If socketIndex < 0 Then
+        ' No free sockets available, try again later
+        Exit Sub
+    End If
+    
+    ' Get the next request from the queue and mark as processing
+    m_ProcessingRequest = True
+    
+    ' Set up the socket with the request data
+    m_RequestType(socketIndex) = m_RequestQueue(0).RequestType
+    m_sRequest(socketIndex) = m_RequestQueue(0).Request
+    m_Target(socketIndex) = m_RequestQueue(0).Target
+    m_ExtraData(socketIndex) = m_RequestQueue(0).ExtraData
+    m_Index(socketIndex) = m_RequestQueue(0).Index
+    
+    ' Connect to the appropriate server based on request type
+    If m_RequestType(socketIndex) = "Icon" Then
+        Connect socketIndex, "cdn.discordapp.com", 443
+    Else
+        Connect socketIndex, m_sBaseUrl, 443
+    End If
+End Sub
+Private Function GetFreeSocketIndex() As Long
+    Dim i As Long
+    
+    For i = 0 To MAX_CONNECTIONS - 1
+        If m_lSocketState(i) = SOCKET_IDLE Then
+            GetFreeSocketIndex = i
+            Exit Function
+        End If
+    Next i
+    
+    ' No free socket found
+    GetFreeSocketIndex = -1
+End Function
 ' Add a request to the queue
-Private Sub QueueRequest(requestType As String, target As String, request As String, Optional extraData As String = "", Optional Index As Long = -1)
+Private Sub QueueRequest(RequestType As String, Target As String, Request As String, Optional ExtraData As String = "", Optional Index As Long = -1)
     ' Resize the queue array
     If m_QueueCount = 0 Then
         ReDim m_RequestQueue(0)
@@ -935,78 +1181,20 @@ Private Sub QueueRequest(requestType As String, target As String, request As Str
     
     ' Add the request
     With m_RequestQueue(m_QueueCount)
-        .requestType = requestType
-        .target = target
-        .request = request
-        .extraData = extraData
+        .RequestType = RequestType
+        .Target = Target
+        .Request = Request
+        .ExtraData = ExtraData
         .Index = Index
     End With
     ' Increment counter
     m_QueueCount = m_QueueCount + 1
     
-    ' Start processing if not already doing so
-    If Not m_ProcessingRequest Then
         ProcessNextQueuedRequest
-    End If
     
+   ' DequeueAndProcessNext
 End Sub
-Private Sub ProcessNextQueuedRequest()
-    ' Exit if no requests in queue
-    If m_QueueCount = 0 Then
-        m_ProcessingRequest = False
-        Exit Sub
-    End If
-    
-    m_ProcessingRequest = True
-    
-    ' Get the first request details without dequeuing yet
-    Dim requestType As String
-    Dim target As String
-    Dim request As String
-    Dim extraData As String
-    Dim Index As Long
-    
-    requestType = m_RequestQueue(0).requestType
-    target = m_RequestQueue(0).target
-    request = m_RequestQueue(0).request
-    extraData = m_RequestQueue(0).extraData
-    Index = m_RequestQueue(0).Index
-    
-    ' Attempt to connect
-    Dim socketIndex As Long
-    Select Case requestType
-        Case "GuildList"
-            socketIndex = Connect(m_sBaseUrl, 443, "GuildList", request)
-        Case "Channels"
-            socketIndex = Connect(m_sBaseUrl, 443, "Channels", request)
-        Case "Messages"
-            socketIndex = Connect(m_sBaseUrl, 443, "Messages", request)
-        Case "SendMessage"
-            socketIndex = Connect(m_sBaseUrl, 443, "SendMessage", request)
-        Case "Icon"
-            Dim iconParts() As String
-            iconParts = Split(extraData, "|")
-            If UBound(iconParts) >= 1 Then
-                socketIndex = Connect("cdn.discordapp.com", 443, "Icon", request, True)
-            Else
-                ' Invalid request, dequeue
-                DequeueAndProcessNext
-                Exit Sub
-            End If
-        Case Else
-            ' Unknown type, dequeue
-            DequeueAndProcessNext
-            Exit Sub
-    End Select
-    
-    If socketIndex = 0 Then
-        ' No sockets available, keep request in queue and exit
-        m_ProcessingRequest = False
-    Else
-        ' Request started, dequeue it
-        DequeueAndProcessNext
-    End If
-End Sub
+
 ' Remove the first request from the queue and process the next one
 Private Sub DequeueAndProcessNext()
     ' Make sure we have requests
@@ -1034,16 +1222,30 @@ Private Sub DequeueAndProcessNext()
         ProcessNextQueuedRequest
     End If
 End Sub
-
+' Process completed HTTP response for a specific socket
 Private Sub ProcessCompleteResponse(ByVal socketIndex As Long)
-    ' Check what type of request we were processing
-    Select Case m_CurrentRequestType(socketIndex)
+    ' Skip if invalid index
+    If socketIndex < 0 Or socketIndex >= MAX_CONNECTIONS Then
+        Exit Sub
+    End If
+    
+    Dim sResponse As String
+    Dim bFetchingIcon As Boolean
+    
+    ' Get response from buffer
+    sResponse = m_sResponseBuffer(socketIndex)
+    
+    ' Check request type
+    bFetchingIcon = (m_RequestType(socketIndex) = "Icon")
+    
+    ' Process based on request type
+    Select Case m_RequestType(socketIndex)
         Case "Icon"
-            ProcessIconResponse m_sResponseBuffer(socketIndex), socketIndex
+            ProcessIconResponse socketIndex, sResponse
             
         Case "GuildList"
             Dim sContent As String
-            sContent = ParseHttpResponse(m_sResponseBuffer(socketIndex), socketIndex)
+            sContent = ParseHttpResponse(sResponse, bFetchingIcon)
             If InStr(sContent, vbCrLf) > 0 Then
                 sContent = Mid$(sContent, InStr(sContent, vbCrLf) + 2)
             End If
@@ -1051,7 +1253,7 @@ Private Sub ProcessCompleteResponse(ByVal socketIndex As Long)
             
         Case "Channels"
             Dim sChannelContent As String
-            sChannelContent = ParseHttpResponse(m_sResponseBuffer(socketIndex), socketIndex)
+            sChannelContent = ParseHttpResponse(sResponse, bFetchingIcon)
             If InStr(sChannelContent, vbCrLf) > 0 Then
                 sChannelContent = Mid$(sChannelContent, InStr(sChannelContent, vbCrLf) + 2)
             End If
@@ -1059,23 +1261,33 @@ Private Sub ProcessCompleteResponse(ByVal socketIndex As Long)
             
         Case "Messages"
             Dim sMessageContent As String
-            sMessageContent = ParseHttpResponse(m_sResponseBuffer(socketIndex), socketIndex)
+            sMessageContent = ParseHttpResponse(sResponse, bFetchingIcon)
             If InStr(sMessageContent, vbCrLf) > 0 Then
                 sMessageContent = Mid$(sMessageContent, InStr(sMessageContent, vbCrLf) + 2)
             End If
             ProcessMessagesResponse sMessageContent
             
         Case "SendMessage"
-            ' Just cleanup - no special handling needed
+            ' After sending a message, you might want to refresh the current channel
+            If Len(m_sCurrentChannelId) > 0 Then
+            End If
             
+        Case Else
+            ' Unknown request type
+            Debug.Print "Unknown request type: " & m_RequestType(socketIndex)
     End Select
     
-    ' Reset buffer and flags
-    m_sResponseBuffer(socketIndex) = ""
-    m_bReceivingData(socketIndex) = False
-    m_lContentLength(socketIndex) = 0
+    ' Reset this socket
+    ResetSocket socketIndex
+    
+    ' Process next request in queue
+    m_ProcessingRequest = False
+    
+    ' Check if there are more requests to process
+    If m_QueueCount > 0 Then
+        ProcessNextQueuedRequest
+    End If
 End Sub
-
 
 ' Update existing methods to use the queue system
 Private Sub FetchUserGuilds()
@@ -1119,7 +1331,8 @@ Private Sub FetchGuildChannels(ByVal sGuildId As String)
 EH:
     MsgBox "Error fetching channels: " & Err.Description, vbCritical
 End Sub
-Private Sub FetchChannelMessages(ByVal sChannelId As String, Optional ByVal lLimit As Long = 20)
+
+Private Sub FetchChannelMessages(ByVal sChannelId As String, Optional ByVal lLimit As Long = 10)
     On Error GoTo EH
     
     ' Create the API request path
@@ -1133,20 +1346,13 @@ Private Sub FetchChannelMessages(ByVal sChannelId As String, Optional ByVal lLim
               "Authorization: " & m_sToken & vbCrLf & _
               "Connection: close" & vbCrLf & vbCrLf
     
-    ' Connect directly with request
-    Dim socketIndex As Long
-    socketIndex = Connect(m_sBaseUrl, 443, "Messages", sRequest)
-    
-    If socketIndex = 0 Then
-        MsgBox "No available sockets to fetch messages. Try again later.", vbExclamation
-    End If
-    
+    ' Queue this request
+    QueueRequest "Messages", sChannelId, sRequest
     Exit Sub
 EH:
     MsgBox "Error fetching messages: " & Err.Description, vbCritical
 End Sub
 
-' Updated SendDiscordMessage to use socket array
 Private Sub SendDiscordMessage(ByVal sChannelId As String, ByVal sMessage As String)
     On Error GoTo EH
     
@@ -1168,34 +1374,14 @@ Private Sub SendDiscordMessage(ByVal sChannelId As String, ByVal sMessage As Str
               "Connection: close" & vbCrLf & vbCrLf & _
               sPayload
     
-    ' Connect directly with request
-    Dim socketIndex As Long
-    socketIndex = Connect(m_sBaseUrl, 443, "SendMessage", sRequest)
-    
-    If socketIndex = 0 Then
-        MsgBox "No available sockets to send message. Try again later.", vbExclamation
-    End If
-    
+    QueueRequest "SendMessage", sChannelId, sRequest
     Exit Sub
 EH:
     MsgBox "Error sending message: " & Err.Description, vbCritical
 End Sub
-Private Function GetNextAvailableSocket() As Integer
-    ' Find the first available socket
-    Dim i As Integer
-    For i = 0 To m_MaxSockets - 1
-        If m_CurrentRequestType(i) = "" And wscSocket(i).State <> sckConnected Then
-            GetNextAvailableSocket = i
-            Exit Function
-        End If
-    Next i
-    
-    ' If all sockets are busy, return -1
-    GetNextAvailableSocket = -1
-End Function
+
+' Update icon fetching system to use the queue
 Private Sub QueueGuildIconFetch(ByVal sGuildId As String, ByVal sIconHash As String, ByVal guildIndex As Long)
-    On Error GoTo EH
-    
     ' Create the API request path for JPG icon
     Dim sPath As String
     sPath = "/icons/" & sGuildId & "/" & sIconHash & ".jpg?size=80&quality=lossless"
@@ -1210,89 +1396,62 @@ Private Sub QueueGuildIconFetch(ByVal sGuildId As String, ByVal sIconHash As Str
              "Referer: https://discord.com/" & vbCrLf & _
              "Authorization: " & m_sToken & vbCrLf & _
              "Connection: close" & vbCrLf & vbCrLf
-    
-    ' Create a special request type that embeds the guild index and icon hash
-    ' Format: "Icon|guildId|iconHash|guildIndex"
-    Dim requestType As String
-    requestType = "Icon|" & sGuildId & "|" & sIconHash & "|" & guildIndex
-    
-    ' Connect with the right parameter order:
-    ' Connect(ByVal sServer As String, ByVal lPort As Long, ByVal sRequestType As String, ByVal sRequest As String, Optional ByVal bFetchingIcon As Boolean = False)
-    Dim socketIndex As Long
-    socketIndex = Connect("cdn.discordapp.com", 443, requestType, sRequest, True)
-    
-    If socketIndex = 0 Then
-        ' No sockets available, queue the request for later processing
-        QueueRequest "Icon", sGuildId, sRequest, sIconHash & "|" & guildIndex, guildIndex
-    End If
-    
-    Exit Sub
-EH:
-    MsgBox "Error fetching icon: " & Err.Description, vbCritical
+             
+    QueueRequest "Icon", sGuildId, sRequest, sIconHash, guildIndex
 End Sub
-Private Sub ProcessIconResponse(ByVal sResponse As String, ByVal socketIndex As Long)
+
+Private Sub ProcessIconResponse(ByVal socketIndex As Long, ByVal sResponse As String)
     On Error GoTo EH
-    
-    ' Extract guildId, iconHash and guildIndex from the request type
-    Dim parts() As String
-    Dim guildId As String
-    Dim iconHash As String
+
+    Dim headerEnd As Long
+    Dim tempFile As String
+    Dim isAnimated As Boolean
     Dim guildIndex As Long
+    Dim iconHash As String
     
-    parts = Split(m_CurrentRequestType(socketIndex), "|")
+    ' Extract details from current socket
+    iconHash = m_ExtraData(socketIndex)
+    guildIndex = m_Index(socketIndex)
     
-    If UBound(parts) >= 3 Then
-        guildId = parts(1)
-        iconHash = parts(2)
-        guildIndex = CLng(parts(3))
+    ' Detect animated icon via hash
+    isAnimated = (Left$(iconHash, 2) = "a_")
+
+    ' Find end of HTTP headers
+    headerEnd = InStr(sResponse, vbCrLf & vbCrLf)
+
+    If headerEnd > 0 Then
+        Dim binaryData As String
+        binaryData = Mid$(sResponse, headerEnd + 4)
         
-        ' Check if animated
-        Dim isAnimated As Boolean
-        isAnimated = (Left$(iconHash, 2) = "a_")
-        
-        ' Find end of HTTP headers
-        Dim headerEnd As Long
-        headerEnd = InStr(sResponse, vbCrLf & vbCrLf)
-        
-        If headerEnd > 0 Then
-            ' Extract binary data
-            Dim binaryData As String
-            binaryData = Mid$(sResponse, headerEnd + 4)
-            
-            ' Determine file extension based on type
-            Dim fileExt As String
-            If isAnimated Then
-                fileExt = ".gif"
-            Else
-                fileExt = ".jpg"
-            End If
-            
-            ' Save to temp file
-            Dim tempFile As String
-            tempFile = Environ$("TEMP") & "\discord_icon_" & guildId & "_" & Format$(Now, "yyyymmddhhmmss") & fileExt
-            
-            Dim fileNum As Integer
-            fileNum = FreeFile
-            Open tempFile For Binary As #fileNum
-            Put #fileNum, , binaryData
-            Close #fileNum
-            
-            ' Load as picture
-            Dim icon As StdPicture
-            Set icon = LoadPicture(tempFile)
-            
-            ' Update guild icon in the UI
-            GuildView1.UpdateGuildIcon guildIndex, icon
-            
-            ' Clean up temp file
-            On Error Resume Next
-            Kill tempFile
-            On Error GoTo 0
+        ' Use .gif for animated, .jpg otherwise
+        Dim fileExt As String
+        If isAnimated Then
+            fileExt = ".gif"
+        Else
+            fileExt = ".jpg"
         End If
+        
+        tempFile = Environ$("TEMP") & "\discord_icon_" & Format$(Now, "yyyymmddhhmmss") & fileExt
+
+        ' Save binary image data
+        Dim fileNum As Integer
+        fileNum = FreeFile
+        Open tempFile For Binary As #fileNum
+        Put #fileNum, , binaryData
+        Close #fileNum
+
+        ' Load into StdPicture (non-animated even if GIF)
+        Dim icon As StdPicture
+        Set icon = LoadPicture(tempFile)
+        
+        ' Update UI
+        GuildView1.UpdateGuildIcon guildIndex + 1, icon
+
+        ' Clean up temp
+        Kill tempFile
     End If
-    
+
     Exit Sub
-    
 EH:
     Debug.Print "Error processing icon: " & Err.Description
 End Sub
@@ -1364,11 +1523,6 @@ Private Function pvInitRegExp(sPattern As String) As Object
         End If
     End With
 End Function
-
-
-
-
-
 
 
 
