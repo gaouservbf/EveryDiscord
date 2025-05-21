@@ -154,7 +154,7 @@ Begin VB.Form Form1
          BackColor       =   &H8000000C&
          BorderStyle     =   0  'None
          Height          =   555
-         Left            =   630
+         Left            =   525
          ScaleHeight     =   555
          ScaleWidth      =   555
          TabIndex        =   12
@@ -296,8 +296,8 @@ Begin VB.Form Form1
       TabIndex        =   9
       Top             =   0
       Width           =   6735
-      _extentx        =   9763
-      _extenty        =   8493
+      _ExtentX        =   9763
+      _ExtentY        =   8493
    End
    Begin MSWinsockLib.Winsock wsGuildIcon 
       Index           =   1
@@ -323,8 +323,8 @@ Begin VB.Form Form1
       TabIndex        =   10
       Top             =   0
       Width           =   1335
-      _extentx        =   2355
-      _extenty        =   12303
+      _ExtentX        =   2355
+      _ExtentY        =   12303
    End
    Begin MSWinsockLib.Winsock wsMessage 
       Left            =   0
@@ -478,15 +478,23 @@ Private Sub SendData(ByVal socketIndex As Long, baData() As Byte)
     End If
 End Sub
 
+Private Sub Command2_Click()
+Form3.Show
+End Sub
+
 Private Sub Form_Resize()
     ChatView1.Width = Me.ScaleWidth - GuildView1.Width - lstChannel.Width
 End Sub
 
 Private Sub GuildView1_GuildSelected(ByVal Index As Long)
+If Index = 0 Then
+FetchUserDMs
+Else
+
     Dim SelectedIndex As Long
     Dim GuildId As String
     
-    SelectedIndex = Index
+    SelectedIndex = Index - 1
     
     If SelectedIndex >= 0 And SelectedIndex < UBound(m_GuildIds) + 1 Then
         ' Get the ID from our parallel array
@@ -496,6 +504,7 @@ Private Sub GuildView1_GuildSelected(ByVal Index As Long)
         FetchGuildChannels GuildId
         Label3.Caption = "<" & GuildView1.GetGuildName(Index) & ">"
         Me.Caption = "EveryDiscord - " & GuildView1.GetGuildName(Index)
+    End If
     End If
 End Sub
 
@@ -596,6 +605,7 @@ Private Sub wscSocket_DataArrival(Index As Integer, ByVal bytesTotal As Long)
     End If
 End Sub
 Private Sub wscSocket_Close(Index As Integer)
+     
     If Not TlsIsClosed(m_uCtx(Index)) Then
         OnClose Index
     End If
@@ -880,6 +890,7 @@ Private Sub ProcessChannelsResponse(aJson As String)
     Dim channelCount As Long
     Dim sjson As String
     Dim validChannels As Long
+    
     ' Clean up the JSON input string - remove trailing characters if present
     If Len(aJson) > 5 Then
         sjson = Left$(aJson, Len(aJson) - 5)
@@ -897,34 +908,57 @@ Private Sub ProcessChannelsResponse(aJson As String)
     
     ' Clear existing channels
     lstChannel.Clear
+    
+    ' Count text channels first (type 0)
+    channelCount = 0
+    For i = 1 To parsed.Value.Count
+        On Error Resume Next
+        Dim countChannel As Object
+        Set countChannel = parsed.Value(i)
+        
+        If Not countChannel Is Nothing Then
+            If countChannel("type") = 0 Then ' Only count text channels
+                channelCount = channelCount + 1
+            End If
+        End If
+        On Error GoTo 0
+    Next i
+    
+    ' Resize the channel IDs array to hold all channels
+    ReDim m_ChannelIds(0 To channelCount - 1) As String
+    
+    ' Reset valid channels counter
+    validChannels = 0
  
-    For i = 1 To parsed.Value.Count  ' Increased to handle larger guilds
+    ' Process each channel
+    For i = 1 To parsed.Value.Count
         On Error Resume Next
         Dim channel As Object
         Set channel = parsed.Value(i)
         
-        
-        ' Extract channel details
-        Dim sChannelName As String
-        Dim sChannelId As String
-        Dim lChannelType As Long
-        
-        sChannelName = channel("name")
-        sChannelId = channel("id")
-        lChannelType = channel("type")
-        
-        ' Only add text channels (type 0)
-        If lChannelType = 0 Then
-            ' Add to listbox
-            lstChannel.AddItem sChannelName
+        If Not channel Is Nothing Then
+            ' Extract channel details
+            Dim sChannelName As String
+            Dim sChannelId As String
+            Dim lChannelType As Long
             
-            ' Store ID in parallel array (check bounds first)
-            If validChannels <= UBound(m_ChannelIds) Then
-                m_ChannelIds(validChannels) = sChannelId
-                validChannels = validChannels + 1
+            sChannelName = channel("name")
+            sChannelId = channel("id")
+            lChannelType = channel("type")
+            
+            ' Only add text channels (type 0)
+            If lChannelType = 0 Then
+                ' Add to listbox
+                lstChannel.AddItem sChannelName
                 
-                ' Debug output
-                Debug.Print "Added channel: " & sChannelName & " with ID: " & sChannelId
+                ' Store ID in array (we know it's properly sized now)
+                If validChannels < channelCount Then
+                    m_ChannelIds(validChannels) = sChannelId
+                    validChannels = validChannels + 1
+                    
+                    ' Debug output
+                    Debug.Print "Added channel: " & sChannelName & " with ID: " & sChannelId
+                End If
             End If
         End If
         On Error GoTo 0
@@ -935,7 +969,6 @@ Private Sub ProcessChannelsResponse(aJson As String)
         lstChannel.ListIndex = 0
     End If
 End Sub
-
 Private Sub lstGuild_Click()
     ' Get the selected guild ID
 End Sub
@@ -944,11 +977,17 @@ Private Sub lstChannel_Click()
     ' Get the selected channel ID
     Dim SelectedIndex As Long
     Dim channelId As String
-    MsgBox lstChannel.ListIndex
+    
     SelectedIndex = lstChannel.ListIndex
     
-    If SelectedIndex >= 0 And SelectedIndex < UBound(m_ChannelIds) + 1 Then
-        ' Get the ID from our parallel array
+    ' Make sure we have a valid selection
+    If SelectedIndex < 0 Then
+        Exit Sub
+    End If
+    
+    ' Verify we're within the bounds of our channel ID array
+    If SelectedIndex < UBound(m_ChannelIds) + 1 Then
+        ' Get the ID from our array
         channelId = m_ChannelIds(SelectedIndex)
         Debug.Print "Selected channel ID: " & channelId
         
@@ -960,6 +999,8 @@ Private Sub lstChannel_Click()
         
         ' Fetch messages for this channel
         FetchChannelMessages channelId
+    Else
+        Debug.Print "Warning: Selected index " & SelectedIndex & " is out of bounds for m_ChannelIds array (size: " & UBound(m_ChannelIds) + 1 & ")"
     End If
 End Sub
 
@@ -1085,11 +1126,11 @@ Private Sub Form_Load()
     
     ' Auto load channel from settings if available
     If GetSetting("DiscordClient", "Settings", "ChannelId", "") <> "" Then
-        txtCID.Text = GetSetting("DiscordClient", "Settings", "ChannelId", "")
+        'txtCID.Text = GetSetting("DiscordClient", "Settings", "ChannelId", "")
         
         ' Auto-fetch messages if we have both token and channel
         If Len(m_sToken) > 0 Then
-            FetchChannelMessages txtCID.Text
+            'FetchChannelMessages txtCID.Text
             FetchUserGuilds
         End If
     End If
@@ -1222,6 +1263,194 @@ Private Sub DequeueAndProcessNext()
         ProcessNextQueuedRequest
     End If
 End Sub
+Private Sub ProcessDMsResponse(aJson As String)
+    Dim parsed As ParseResult ' Assuming Parse returns an object (e.g., a Collection or a custom ParseResult type)
+                        ' with Value, IsValid, and Error properties.
+    Dim i As Long
+    Dim dmGcCount As Long
+    Dim sjson As String
+    Dim validDmsGcs As Long
+    Dim channel As Object
+    Dim recipients As Object
+    Dim recipientUser As Object
+    Dim k As Long
+    Dim arrUsernames() As String
+    ' Clean up the JSON input string - this was in the original, might be specific to the HTTP client/server
+    ' It attempts to remove a potential 5-character suffix.
+    If Len(aJson) > 5 Then
+        sjson = Left$(aJson, Len(aJson) - 5)
+    Else
+        sjson = aJson
+    End If
+    
+    On Error GoTo EH ' General error handler for the sub
+
+    ' Parse the JSON string using your existing Parse function.
+    ' This assumes 'Parse(sjson)' returns an object (which could be a custom UDT like ParseResult
+    ' or a generic object) that has an 'IsValid' property, an 'Error' property,
+    ' and a 'Value' property (typically a collection of channel objects).
+    parsed = Parse(sjson)
+
+    If Not parsed.IsValid Then
+        MsgBox "Error parsing DM/GC data: " & parsed.Error, vbExclamation
+        Exit Sub
+    End If
+    
+    If parsed.Value Is Nothing Then
+        MsgBox "Parsed JSON value (parsed.Value) is Nothing.", vbExclamation
+        Exit Sub
+    End If
+
+    ' Clear existing items from the listbox (assuming lstChannel is the name of your ListBox control)
+    lstChannel.Clear
+    
+    ' --- First Pass: Count relevant DMs and GCs ---
+    dmGcCount = 0
+    For i = 1 To parsed.Value.Count ' Assuming parsed.Value is a 1-based collection
+        On Error Resume Next ' In case a channel object is malformed or "type" is missing
+        Set channel = parsed.Value(i)
+        If Err.Number <> 0 Then
+            Debug.Print "Error accessing channel object at index " & i & ": " & Err.Description
+            Err.Clear
+            Set channel = Nothing ' Ensure channel is Nothing if access failed
+        End If
+        On Error GoTo 0
+
+        If Not channel Is Nothing Then
+            Dim channelType As Long
+            On Error Resume Next ' In case "type" property is missing or not a number
+            channelType = -1 ' Default to an invalid type
+            channelType = channel("type")
+            If Err.Number <> 0 Then
+                Debug.Print "Error reading channel type for channel ID: " & channel("id") & " - " & Err.Description
+                channelType = -1 ' Ensure it's an invalid type if read failed
+                Err.Clear
+            End If
+            On Error GoTo 0
+            
+            ' Type 1: DM (Direct Message)
+            ' Type 3: Group DM (Group Chat)
+            If channelType = 1 Or channelType = 3 Then
+                dmGcCount = dmGcCount + 1
+            End If
+        End If
+    Next i
+    
+    ' Resize the module-level channel IDs array
+    If dmGcCount > 0 Then
+        ReDim m_ChannelIds(0 To dmGcCount - 1) As String
+    Else
+        ' If no DMs/GCs, ensure m_ChannelIds is empty or handled appropriately
+        Erase m_ChannelIds ' Clears the array and deallocates memory
+    End If
+    
+    ' --- Second Pass: Populate Listbox and Array ---
+    validDmsGcs = 0 ' Counter for 0-based m_ChannelIds array
+    For i = 1 To parsed.Value.Count ' Assuming parsed.Value is a 1-based collection
+        Set channel = Nothing ' Reset for each iteration
+        On Error Resume Next
+        Set channel = parsed.Value(i)
+        If Err.Number <> 0 Then
+            Debug.Print "Error accessing channel object (pass 2) at index " & i & ": " & Err.Description
+            Err.Clear
+            GoTo NextChannelIteration ' Skip to next iteration if channel object is bad
+        End If
+        On Error GoTo 0
+
+        If Not channel Is Nothing Then
+            Dim sChannelId As String
+            Dim lChannelType As Long
+            Dim sDisplayName As String
+            
+            On Error Resume Next
+            sChannelId = channel("id")
+            lChannelType = channel("type")
+            If Err.Number <> 0 Then
+                Debug.Print "Error reading ID or Type for a channel. Skipping."
+                Err.Clear
+                GoTo NextChannelIteration
+            End If
+            On Error GoTo 0
+
+            sDisplayName = ""
+
+            If lChannelType = 1 Then ' DM Channel
+                On Error Resume Next
+                Set recipients = channel("recipients")
+                If Err.Number = 0 And Not recipients Is Nothing Then
+                    If recipients.Count > 0 Then
+                        ' Assuming the first recipient in a DM channel's list is the other user
+                        Set recipientUser = recipients(1) ' Assuming 1-based collection from your JSON parser
+                        If Not recipientUser Is Nothing Then
+                            sDisplayName = recipientUser("username")
+                        Else
+                            sDisplayName = "DM with Unknown User"
+                        End If
+                    Else
+                        sDisplayName = "DM (No Recipient Info)"
+                    End If
+                Else
+                    sDisplayName = "DM (Error Reading Recipients)"
+                End If
+                Err.Clear
+                On Error GoTo 0
+                
+            ElseIf lChannelType = 3 Then ' Group DM Channel
+                On Error Resume Next
+                sDisplayName = channel("name") ' Group DMs can have a name
+                If Err.Number <> 0 Or IsNull(sDisplayName) Or Trim(CStr(sDisplayName & "")) = "" Then
+                    Err.Clear
+                    ' If no name, or error reading name, construct from recipients
+                    Set recipients = channel("recipients")
+                    If Err.Number = 0 And Not recipients Is Nothing Then
+                        If recipients.Count > 0 Then
+                            ReDim arrUsernames(1 To recipients.Count) ' Assuming 1-based collection
+                            For k = 1 To recipients.Count
+                                Set recipientUser = recipients(k) ' Assuming 1-based
+                                If Not recipientUser Is Nothing Then
+                                    arrUsernames(k) = recipientUser("username")
+                                Else
+                                    arrUsernames(k) = "Unknown"
+                                End If
+                            Next k
+                            sDisplayName = Join(arrUsernames, ", ")
+                        Else
+                            sDisplayName = "Empty Group"
+                        End If
+                    Else
+                        sDisplayName = "Unnamed Group"
+                    End If
+                End If
+                Err.Clear
+                On Error GoTo 0
+            End If
+            
+            ' Add to ListBox and array if it's a DM or GC and we have a name
+            If (lChannelType = 1 Or lChannelType = 3) And Trim(sDisplayName & "") <> "" Then
+                If validDmsGcs < dmGcCount Then ' Ensure we don't go out of bounds
+                    lstChannel.AddItem sDisplayName
+                    m_ChannelIds(validDmsGcs) = sChannelId
+                    validDmsGcs = validDmsGcs + 1
+                    
+                    Debug.Print "Added DM/GC: """ & sDisplayName & """ with ID: " & sChannelId
+                Else
+                    Debug.Print "Warning: dmGcCount mismatch or sDisplayName empty for channel ID: " & sChannelId
+                End If
+            End If
+        End If
+NextChannelIteration:
+    Next i
+    
+    ' If we found any DMs/GCs, select the first one in the list
+    If lstChannel.ListCount > 0 Then
+        lstChannel.ListIndex = 0
+    End If
+    
+    Exit Sub
+EH:
+    MsgBox "Error in ProcessDMsResponse: " & Err.Description, vbCritical
+End Sub
+
 ' Process completed HTTP response for a specific socket
 Private Sub ProcessCompleteResponse(ByVal socketIndex As Long)
     ' Skip if invalid index
@@ -1250,6 +1479,15 @@ Private Sub ProcessCompleteResponse(ByVal socketIndex As Long)
                 sContent = Mid$(sContent, InStr(sContent, vbCrLf) + 2)
             End If
             ProcessGuildsResponse sContent
+            
+        Case "DMs"
+            sContent = ParseHttpResponse(sResponse, bFetchingIcon)
+            If InStr(sContent, vbCrLf) > 0 Then
+                sContent = Mid$(sContent, InStr(sContent, vbCrLf) + 2)
+            End If
+            ProcessDMsResponse sContent
+            MsgBox "sup"
+            
             
         Case "Channels"
             Dim sChannelContent As String
@@ -1330,6 +1568,26 @@ Private Sub FetchGuildChannels(ByVal sGuildId As String)
     Exit Sub
 EH:
     MsgBox "Error fetching channels: " & Err.Description, vbCritical
+End Sub
+Private Sub FetchUserDMs()
+    On Error GoTo EH
+    
+    ' Create the API request path for user channels (DMs and GCs)
+    Dim sPath As String
+    sPath = "api/v10/users/@me/channels" ' Changed from /guilds to /channels
+    
+    ' Prepare the HTTP request
+    Dim sRequest As String
+    sRequest = "GET /" & sPath & " HTTP/1.1" & vbCrLf & _
+               "Host: " & m_sBaseUrl & vbCrLf & _
+               "Authorization: " & m_sToken & vbCrLf & _
+               "Connection: close" & vbCrLf & vbCrLf
+               
+    ' Queue this request with a more appropriate identifier
+    QueueRequest "DMs", "@me", sRequest
+    Exit Sub
+EH:
+    MsgBox "Error fetching DMs/GCs: " & Err.Description, vbCritical ' Updated error message
 End Sub
 
 Private Sub FetchChannelMessages(ByVal sChannelId As String, Optional ByVal lLimit As Long = 10)
