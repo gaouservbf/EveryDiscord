@@ -142,6 +142,7 @@ Begin VB.Form Form1
          BeginProperty Panel1 {0713E89F-850A-101B-AFC0-4210102A8DA7} 
             Text            =   "Connecting..."
             TextSave        =   "Connecting..."
+            Key             =   ""
             Object.Tag             =   ""
          EndProperty
       EndProperty
@@ -274,7 +275,6 @@ Begin VB.Form Form1
       Height          =   375
       Left            =   9960
       TabIndex        =   2
-      Text            =   "1355226543160557778"
       Top             =   6600
       Visible         =   0   'False
       Width           =   7095
@@ -522,10 +522,6 @@ Else
         Me.Caption = "EveryDiscord - " & GuildView1.GetGuildName(Index)
     End If
     End If
-End Sub
-
-Private Sub StatusBar1_PanelClick(ByVal Panel As ComctlLib.Panel)
-
 End Sub
 
 Private Sub Timer1_Timer()
@@ -1176,7 +1172,7 @@ Private Sub Form_Load()
     
     ReDim m_GuildIds(0) As String
     ReDim m_ChannelIds(0) As String
-    MsgBox "Doxx Start"
+    MsgBox "Debug Start"
     MsgBox GetSetting("DiscordClient", "Settings", "Token", "")
     MsgBox GetSetting("DiscordClient", "Settings", "ChannelId", "")
     If GetSetting("DiscordClient", "Settings", "Token", "") <> "" Then

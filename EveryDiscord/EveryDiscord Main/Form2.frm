@@ -106,7 +106,7 @@ Private Sub btnLogin_Click()
         MsgBox "Please enter your Discord token", vbExclamation, "Login Error"
         Exit Sub
     End If
-    
+    SaveSetting "DiscordClient", "Settings", "Token", txtToken.Text
     ' Hide login form and show main form
     Me.Hide
     Form1.Show
