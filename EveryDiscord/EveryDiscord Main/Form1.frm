@@ -12,6 +12,56 @@ Begin VB.Form Form1
    ScaleHeight     =   8370
    ScaleWidth      =   10215
    StartUpPosition =   3  'Windows Default
+   Begin VB.PictureBox Picture3 
+      BackColor       =   &H80000002&
+      BorderStyle     =   0  'None
+      Height          =   500
+      Left            =   1320
+      ScaleHeight     =   495
+      ScaleWidth      =   8790
+      TabIndex        =   13
+      Top             =   0
+      Width           =   8790
+      Begin VB.Label lblChannel 
+         BackStyle       =   0  'Transparent
+         Caption         =   "<Channel Name>"
+         BeginProperty Font 
+            Name            =   "Tahoma"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   700
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
+         EndProperty
+         ForeColor       =   &H8000000E&
+         Height          =   210
+         Left            =   2520
+         TabIndex        =   15
+         Top             =   210
+         Width           =   6270
+      End
+      Begin VB.Label Label3 
+         Alignment       =   2  'Center
+         BackStyle       =   0  'Transparent
+         Caption         =   "<Guild Name>"
+         BeginProperty Font 
+            Name            =   "Tahoma"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   700
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
+         EndProperty
+         ForeColor       =   &H8000000E&
+         Height          =   270
+         Left            =   0
+         TabIndex        =   14
+         Top             =   210
+         Width           =   2175
+      End
+   End
    Begin VB.CommandButton Command1 
       Caption         =   "+"
       BeginProperty Font 
@@ -25,7 +75,7 @@ Begin VB.Form Form1
       EndProperty
       Height          =   435
       Left            =   2520
-      TabIndex        =   13
+      TabIndex        =   11
       Top             =   7560
       Width           =   435
    End
@@ -80,7 +130,7 @@ Begin VB.Form Form1
       Align           =   2  'Align Bottom
       Height          =   375
       Left            =   0
-      TabIndex        =   11
+      TabIndex        =   9
       Top             =   7995
       Width           =   10215
       _ExtentX        =   18018
@@ -130,7 +180,7 @@ Begin VB.Form Form1
       Left            =   0
       ScaleHeight     =   975
       ScaleWidth      =   2775
-      TabIndex        =   5
+      TabIndex        =   4
       Top             =   7080
       Width           =   2775
       Begin VB.CommandButton Command2 
@@ -146,7 +196,7 @@ Begin VB.Form Form1
          EndProperty
          Height          =   330
          Left            =   1680
-         TabIndex        =   14
+         TabIndex        =   12
          Top             =   525
          Width           =   855
       End
@@ -157,7 +207,7 @@ Begin VB.Form Form1
          Left            =   525
          ScaleHeight     =   555
          ScaleWidth      =   555
-         TabIndex        =   12
+         TabIndex        =   10
          Top             =   105
          Width           =   555
       End
@@ -174,7 +224,7 @@ Begin VB.Form Form1
          EndProperty
          Height          =   375
          Left            =   1365
-         TabIndex        =   7
+         TabIndex        =   6
          Top             =   315
          Width           =   1455
       End
@@ -191,7 +241,7 @@ Begin VB.Form Form1
          EndProperty
          Height          =   375
          Left            =   1200
-         TabIndex        =   6
+         TabIndex        =   5
          Top             =   120
          Width           =   1575
       End
@@ -208,7 +258,7 @@ Begin VB.Form Form1
       EndProperty
       Height          =   6495
       Left            =   1320
-      TabIndex        =   4
+      TabIndex        =   3
       Top             =   480
       Width           =   2175
    End
@@ -224,7 +274,7 @@ Begin VB.Form Form1
       EndProperty
       Height          =   375
       Left            =   9960
-      TabIndex        =   3
+      TabIndex        =   2
       Text            =   "1355226543160557778"
       Top             =   6600
       Visible         =   0   'False
@@ -242,7 +292,7 @@ Begin VB.Form Form1
       EndProperty
       Height          =   375
       Left            =   9960
-      TabIndex        =   2
+      TabIndex        =   1
       Text            =   "Token"
       Top             =   7080
       Visible         =   0   'False
@@ -259,27 +309,11 @@ Begin VB.Form Form1
          Strikethrough   =   0   'False
       EndProperty
       Height          =   375
-      Left            =   2880
-      TabIndex        =   1
-      Top             =   7560
-      Width           =   6375
-   End
-   Begin VB.CommandButton cmdSendMsg 
-      Caption         =   "Send"
-      BeginProperty Font 
-         Name            =   "Tahoma"
-         Size            =   8.25
-         Charset         =   0
-         Weight          =   400
-         Underline       =   0   'False
-         Italic          =   0   'False
-         Strikethrough   =   0   'False
-      EndProperty
-      Height          =   375
-      Left            =   9360
+      Left            =   2985
+      MultiLine       =   -1  'True
       TabIndex        =   0
       Top             =   7560
-      Width           =   735
+      Width           =   7110
    End
    Begin MSWinsockLib.Winsock wscSocket 
       Index           =   0
@@ -290,14 +324,14 @@ Begin VB.Form Form1
       _Version        =   393216
       RemotePort      =   443
    End
-   Begin BareboneThunks.ChatView ChatView1 
-      Height          =   6975
+   Begin EveryDiscord.ChatView ChatView1 
+      Height          =   7020
       Left            =   3480
-      TabIndex        =   9
-      Top             =   0
+      TabIndex        =   7
+      Top             =   480
       Width           =   6735
-      _ExtentX        =   9763
-      _ExtentY        =   8493
+      _ExtentX        =   11880
+      _ExtentY        =   12383
    End
    Begin MSWinsockLib.Winsock wsGuildIcon 
       Index           =   1
@@ -317,10 +351,10 @@ Begin VB.Form Form1
       _Version        =   393216
       RemotePort      =   443
    End
-   Begin BareboneThunks.GuildView GuildView1 
+   Begin EveryDiscord.GuildView GuildView1 
       Height          =   6975
       Left            =   0
-      TabIndex        =   10
+      TabIndex        =   8
       Top             =   0
       Width           =   1335
       _ExtentX        =   2355
@@ -332,24 +366,6 @@ Begin VB.Form Form1
       _ExtentX        =   741
       _ExtentY        =   741
       _Version        =   393216
-   End
-   Begin VB.Label Label3 
-      Alignment       =   2  'Center
-      Caption         =   "Guild Name"
-      BeginProperty Font 
-         Name            =   "Tahoma"
-         Size            =   8.25
-         Charset         =   0
-         Weight          =   400
-         Underline       =   0   'False
-         Italic          =   0   'False
-         Strikethrough   =   0   'False
-      EndProperty
-      Height          =   375
-      Left            =   1320
-      TabIndex        =   8
-      Top             =   120
-      Width           =   2175
    End
    Begin VB.Menu mnuMessages 
       Caption         =   "Messages"
@@ -380,7 +396,7 @@ Private Const DISCORD_GATEWAY_PORT As Long = 443
 Private m_lFreeSocketIndex As Long     ' Next available socket index
 
 ' Control array constants
-Private Const MAX_CONNECTIONS As Long = 255
+Private Const MAX_CONNECTIONS As Long = 100
 Private Const SOCKET_IDLE As Long = 0
 Private Const SOCKET_CONNECTING As Long = 1
 Private Const SOCKET_CONNECTED As Long = 2
@@ -484,6 +500,7 @@ End Sub
 
 Private Sub Form_Resize()
     ChatView1.Width = Me.ScaleWidth - GuildView1.Width - lstChannel.Width
+    Picture3.Width = Me.ScaleWidth - Picture3.Left
 End Sub
 
 Private Sub GuildView1_GuildSelected(ByVal Index As Long)
@@ -516,6 +533,42 @@ Private Sub Timer2_Timer()
     'FetchChannelMessages txtCID.Text
 End Sub
 
+
+
+Private Sub txtMsg_Change()
+    If Len(txtMsg.Text) >= 2 Then
+        If Right$(txtMsg.Text, 2) = vbCrLf Then
+             If Len(Trim(txtToken.Text)) = 0 Then
+        MsgBox "Please enter your Discord user token", vbExclamation
+        Exit Sub
+    End If
+    
+    If Len(Trim(txtCID.Text)) = 0 Then
+        MsgBox "Please enter a channel ID", vbExclamation
+        Exit Sub
+    End If
+    
+    If Len(Trim(txtMsg.Text)) = 0 Then
+        MsgBox "Please enter a message to send", vbExclamation
+        Exit Sub
+    End If
+    
+    m_sToken = txtToken.Text
+    
+    ' Save settings
+    SaveSetting "DiscordClient", "Settings", "Token", txtToken.Text
+    SaveSetting "DiscordClient", "Settings", "ChannelId", txtCID.Text
+    
+
+    
+    ' Send the message
+    SendDiscordMessage txtCID.Text, txtMsg.Text
+    
+    ' Clear message textbox
+    txtMsg.Text = ""
+        End If
+    End If
+End Sub
 Private Sub wscSocket_Connect(Index As Integer)
     Dim baEmpty() As Byte
     Dim baOutput() As Byte
@@ -734,6 +787,7 @@ End Sub
 
 ' Called when socket closed
 Private Sub ProcessHttpResponse(ByVal socketIndex As Long)
+DoEvents
     Dim sResponse As String
     Dim bFetchingIcon As Boolean
     
@@ -750,6 +804,7 @@ Private Sub ProcessHttpResponse(ByVal socketIndex As Long)
     
     ' Process based on request type
     Select Case m_RequestType(socketIndex)
+
         Case "Icon"
             ProcessIconResponse socketIndex, sResponse
             
@@ -760,7 +815,12 @@ Private Sub ProcessHttpResponse(ByVal socketIndex As Long)
                 sContent = Mid$(sContent, InStr(sContent, vbCrLf) + 2)
             End If
             ProcessGuildsResponse sContent
-            
+                       Case "DMs"
+            sContent = ParseHttpResponse(sResponse, bFetchingIcon)
+            If InStr(sContent, vbCrLf) > 0 Then
+                sContent = Mid$(sContent, InStr(sContent, vbCrLf) + 2)
+            End If
+            ProcessDMsResponse sContent
         Case "Channels"
             Dim sChannelContent As String
             sChannelContent = ParseHttpResponse(sResponse, bFetchingIcon)
@@ -990,7 +1050,7 @@ Private Sub lstChannel_Click()
         ' Get the ID from our array
         channelId = m_ChannelIds(SelectedIndex)
         Debug.Print "Selected channel ID: " & channelId
-        
+        lblChannel.Caption = "<" & lstChannel.Text & ">"
         ' Set the channel ID in the textbox
         txtCID.Text = channelId
         
@@ -1104,21 +1164,14 @@ Private Function FormatDiscordTimestamp(sTimestamp As String) As String
     End If
 End Function
 
-
-
-' Form initialization
 Private Sub Form_Load()
-    ' Initialize the form
     m_sBaseUrl = "discord.com"
     
-    ' Initialize socket control array and related arrays
     InitializeSocketArray
     
-    ' Initialize guild and channel arrays
     ReDim m_GuildIds(0) As String
     ReDim m_ChannelIds(0) As String
     
-    ' Auto load token from settings if available
     If GetSetting("DiscordClient", "Settings", "Token", "") <> "" Then
         txtToken.Text = GetSetting("DiscordClient", "Settings", "Token", "")
         m_sToken = txtToken.Text
@@ -1127,8 +1180,7 @@ Private Sub Form_Load()
     ' Auto load channel from settings if available
     If GetSetting("DiscordClient", "Settings", "ChannelId", "") <> "" Then
         'txtCID.Text = GetSetting("DiscordClient", "Settings", "ChannelId", "")
-        
-        ' Auto-fetch messages if we have both token and channel
+       
         If Len(m_sToken) > 0 Then
             'FetchChannelMessages txtCID.Text
             FetchUserGuilds
@@ -1150,9 +1202,8 @@ Private Sub InitializeSocketArray()
     ReDim m_Index(0 To MAX_CONNECTIONS - 1)
     ReDim m_Target(0 To MAX_CONNECTIONS - 1)
     
-    ' Initialize each Winsock control
-    For i = 0 To MAX_CONNECTIONS - 1  ' Start from 0, not 1
-        If i > 0 Then Load wscSocket(i)  ' Only load if not the base control
+    For i = 1 To MAX_CONNECTIONS - 1
+         Load wscSocket(i)
         
         ' Set initial state
         m_lSocketState(i) = SOCKET_IDLE
@@ -1161,11 +1212,10 @@ Private Sub InitializeSocketArray()
         m_bReceivingData(i) = False
         m_RequestType(i) = ""
         m_ExtraData(i) = ""
-        m_Index(i) = i  ' Store the actual index
+        m_Index(i) = i
         m_Target(i) = ""
     Next i
     
-    ' Set initial free socket index
     m_lFreeSocketIndex = 0
 End Sub
 Private Sub ProcessNextQueuedRequest()
@@ -1177,7 +1227,6 @@ End If
     ' Find a free socket
     socketIndex = GetFreeSocketIndex()
     If socketIndex < 0 Then
-        ' No free sockets available, try again later
         Exit Sub
     End If
     
@@ -1451,82 +1500,6 @@ EH:
     MsgBox "Error in ProcessDMsResponse: " & Err.Description, vbCritical
 End Sub
 
-' Process completed HTTP response for a specific socket
-Private Sub ProcessCompleteResponse(ByVal socketIndex As Long)
-    ' Skip if invalid index
-    If socketIndex < 0 Or socketIndex >= MAX_CONNECTIONS Then
-        Exit Sub
-    End If
-    
-    Dim sResponse As String
-    Dim bFetchingIcon As Boolean
-    
-    ' Get response from buffer
-    sResponse = m_sResponseBuffer(socketIndex)
-    
-    ' Check request type
-    bFetchingIcon = (m_RequestType(socketIndex) = "Icon")
-    
-    ' Process based on request type
-    Select Case m_RequestType(socketIndex)
-        Case "Icon"
-            ProcessIconResponse socketIndex, sResponse
-            
-        Case "GuildList"
-            Dim sContent As String
-            sContent = ParseHttpResponse(sResponse, bFetchingIcon)
-            If InStr(sContent, vbCrLf) > 0 Then
-                sContent = Mid$(sContent, InStr(sContent, vbCrLf) + 2)
-            End If
-            ProcessGuildsResponse sContent
-            
-        Case "DMs"
-            sContent = ParseHttpResponse(sResponse, bFetchingIcon)
-            If InStr(sContent, vbCrLf) > 0 Then
-                sContent = Mid$(sContent, InStr(sContent, vbCrLf) + 2)
-            End If
-            ProcessDMsResponse sContent
-            MsgBox "sup"
-            
-            
-        Case "Channels"
-            Dim sChannelContent As String
-            sChannelContent = ParseHttpResponse(sResponse, bFetchingIcon)
-            If InStr(sChannelContent, vbCrLf) > 0 Then
-                sChannelContent = Mid$(sChannelContent, InStr(sChannelContent, vbCrLf) + 2)
-            End If
-            ProcessChannelsResponse sChannelContent
-            
-        Case "Messages"
-            Dim sMessageContent As String
-            sMessageContent = ParseHttpResponse(sResponse, bFetchingIcon)
-            If InStr(sMessageContent, vbCrLf) > 0 Then
-                sMessageContent = Mid$(sMessageContent, InStr(sMessageContent, vbCrLf) + 2)
-            End If
-            ProcessMessagesResponse sMessageContent
-            
-        Case "SendMessage"
-            ' After sending a message, you might want to refresh the current channel
-            If Len(m_sCurrentChannelId) > 0 Then
-            End If
-            
-        Case Else
-            ' Unknown request type
-            Debug.Print "Unknown request type: " & m_RequestType(socketIndex)
-    End Select
-    
-    ' Reset this socket
-    ResetSocket socketIndex
-    
-    ' Process next request in queue
-    m_ProcessingRequest = False
-    
-    ' Check if there are more requests to process
-    If m_QueueCount > 0 Then
-        ProcessNextQueuedRequest
-    End If
-End Sub
-
 ' Update existing methods to use the queue system
 Private Sub FetchUserGuilds()
     On Error GoTo EH
@@ -1660,7 +1633,7 @@ End Sub
 
 Private Sub ProcessIconResponse(ByVal socketIndex As Long, ByVal sResponse As String)
     On Error GoTo EH
-
+DoEvents
     Dim headerEnd As Long
     Dim tempFile As String
     Dim isAnimated As Boolean

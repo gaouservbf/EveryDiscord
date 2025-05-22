@@ -1,6 +1,1 @@
-Line 57: Class ComctlLib.StatusBar of control StatusBar1 was not a loaded control class.
-Line 64: The property name _ExtentX in StatusBar1 is invalid.
-Line 65: The property name _ExtentY in StatusBar1 is invalid.
-Line 66: The property name SimpleText in StatusBar1 is invalid.
-Line 67: The property name _Version in StatusBar1 is invalid.
-Line 76: The property name Panels in StatusBar1 is invalid.
+Line 10: Property Icon in Form1 had an invalid file reference.
