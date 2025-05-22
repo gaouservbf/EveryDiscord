@@ -142,7 +142,6 @@ Begin VB.Form Form1
          BeginProperty Panel1 {0713E89F-850A-101B-AFC0-4210102A8DA7} 
             Text            =   "Connecting..."
             TextSave        =   "Connecting..."
-            Key             =   ""
             Object.Tag             =   ""
          EndProperty
       EndProperty
@@ -525,6 +524,10 @@ Else
     End If
 End Sub
 
+Private Sub StatusBar1_PanelClick(ByVal Panel As ComctlLib.Panel)
+
+End Sub
+
 Private Sub Timer1_Timer()
    ' FetchUserGuilds
 End Sub
@@ -815,12 +818,14 @@ DoEvents
                 sContent = Mid$(sContent, InStr(sContent, vbCrLf) + 2)
             End If
             ProcessGuildsResponse sContent
-                       Case "DMs"
+            
+        Case "DMs"
             sContent = ParseHttpResponse(sResponse, bFetchingIcon)
             If InStr(sContent, vbCrLf) > 0 Then
                 sContent = Mid$(sContent, InStr(sContent, vbCrLf) + 2)
             End If
             ProcessDMsResponse sContent
+            
         Case "Channels"
             Dim sChannelContent As String
             sChannelContent = ParseHttpResponse(sResponse, bFetchingIcon)
@@ -1171,7 +1176,9 @@ Private Sub Form_Load()
     
     ReDim m_GuildIds(0) As String
     ReDim m_ChannelIds(0) As String
-    
+    MsgBox "Doxx Start"
+    MsgBox GetSetting("DiscordClient", "Settings", "Token", "")
+    MsgBox GetSetting("DiscordClient", "Settings", "ChannelId", "")
     If GetSetting("DiscordClient", "Settings", "Token", "") <> "" Then
         txtToken.Text = GetSetting("DiscordClient", "Settings", "Token", "")
         m_sToken = txtToken.Text
