@@ -6112,5 +6112,3 @@ Private Sub pvGetThunkData(baBuffer() As Byte)
     Call CopyMemory(baBuffer(0), m_baBuffer(0), UBound(baBuffer) + 1)
     Erase m_baBuffer
 End Sub
-
-

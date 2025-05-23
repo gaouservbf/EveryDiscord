@@ -1,0 +1,142 @@
+CHANGELOG - VBWebSocket Project
+===============================
+
+Please note: Your feedback is important! I am unable to test alot of features because i do not have access to servers to test the functionality. Features like compression especially. Your feedback helps fix bugs!
+
+Leave Feedback: https://www.vbforums.com/showthread.php?892835-VB6-Visual-Basic-6-Client-Websocket-Control
+
+
+
+Version 1.11 BETA
+----------------------------------------------------------------------------
+
+1) Added a SendAdvanced() function to allow for sending extension data and/or fine-grained control of the message construction. Some of the same rules apply as the regular Send() function,for example: if you specify blnUTF8Encode then the data should be a text string (normal VB String type) or else it will be treated as a binary string and converted to a byte array and not encoded. Also if you specify compression you must have set the UseCompression option to true before connecting. If you specify compression then RSV1 will be set to true by the websocket. Also Data can only be a byte array or a string. Empty data can be sent.
+2) Had some time to make this control do work in a real environment and discovered a serious bug in the CollapsFramesEx() function having to do with gathering opContinue frames. Seems to work ok now.
+3) Converted entire project to a single EXE project instead of a project group. This will make it easier to add files to a new project instead of having to create a reference to the project or compile it to an OCX. In order to compile as an OCX you will have to create a new Active X project and re-add all the files to it. You will also have to move some Types and Enums back into the Usercontrol. Some Types and Enums had to be moved to the BAS module because of how Usercontrols work in an EXE project. In the future I may include both project types in a single download.
+4) Piesockets demo key was invalidated for some reason and I havent had time to get or look for a new one.
+
+
+Version 1.10 BETA
+----------------------------------------------------------------------------
+
+1) updated the Piesocket example to showcase multiple clients, you can spawn as many clients as you want
+2) small bug fix in disconnect function, dont set readyState back to closing if already closed
+
+
+Version 1.9 BETA - 
+----------------------------------------------------------------------------
+
+1) major bug fix in Send() function (again). When collapsing code from 2 loops into 1, forgot to include binary sends. yikes
+2) all data is now encoded or compressed as needed before the chunk sending loop begins to be more in line with the protocol.
+3) tightened up the Send function code to be smaller, faster and more optimized, added more data integrity checks.
+4) Started working on removing unused code in the compressor and ssl/tls socket code. There is alot of unused code. For now code is just commented out till I can be sure it isnt required by deflate/inflate or the rest of the class code. This will eventually help bring the project code size down significantly and help with load times. Also there is alot of duplicate code in all the classes that could be collected into one code base module.
+5) added a new event onReConnect, that fires if the server is redirecting the connection. this allows you to change the url/uri in any gui display
+
+Version 1.8 BETA - 
+----------------------------------------------------------------------------
+
+1) Now a default "Origin: http:server.com/path"  header is included if one is not specified by the user
+2) Added optional NoUTF8Conversion parameter to the Send() function to allow sending strings as binary, has no effect on byte arrays.
+3) A new property ChunkSize specifies the size of chunks to send. Use this to fine tune your sends, default 4kb, max 16kb recommended
+4) The onMessage event now has a new parameter called opCode that lets you know what type of data is in the websocket message opText(1) or opBinary(2) or extended opcode
+5) added support for extension op codes (3-7, 11-15) and raw extension data which is handled as an untouched byte array. this means you will know how to interpret the data
+6) Updated the html help file to reflect new properties and parameters
+7) updated the echo websocket demo to work again with a new server thanks to Lob.com
+8) fixed alot of small bugs and optimized some code
+
+
+Version 1.7 BETA - 3/23/2022
+----------------------------------------------------------------------------
+1) Fixed a major bug in the send function related to sending large amounts of data
+
+
+Version 1.6 BETA - 3/19/2022
+----------------------------------------------------------------------------
+1) Fixed a major bug in the send function when string data is greater than 4096 bytes
+2) bug fix in Reconnect function from a copy paste error
+3) fixed bug in raisedata function when decompressing data
+
+
+Version 1.5 BETA - 10/23/2021
+----------------------------------------------------------------------------
+
+ Notes:Ive had an opportunity to test the control in a real world situation and its helped expose
+       a few bugs mainly in buffer handling of large packets and the ability to NOT close the connection
+       if the underlying socket gets in an unstable state for some reason. (socket stuck in post tls handshake state)
+       After processing literally Gigabytes of incoming data without an error, im pretty confident in the buffer handling.
+
+1) Changed the logic for handling large buffers... seems to be working well
+2) Added new code to better shutdown socket in unstable state, exposed ForceShutdown() method for use
+3) Now if disconnect is called several times before connect, websocket calls forceshutdown instead of trying
+   to send close frame to server.
+4) Fixed the issue with the websocket only using TLS 3.1
+
+Known Issues:
+1) Proxies are not supported, will probably/maybe add support in a future update.
+2) There are several features (such as compression) that have not been tested because I cant find a server to test them with, but in theory they should work so long as the code is correct.
+
+
+Version 1.4 BETA - 9/15/2021
+----------------------------------------------------------------------------
+1) Fixed a bug with sending ready made close, ping,and pong frames (leftover old code bug) .
+2) Related to 1) - fixed a bug with answering server pings. 
+3) Handling of server close messages with an error code and description included is now complete and working properly.
+4) fixed the piesocket disconnect issue and improved the piesocket demo.
+5) changed the fragmented frames strategy from a single buffer, to a list of buffers.
+6) finished all the http code error messages
+7) Add a onPong() event and a Ping() method. This allows for user to send pings to the server and recieve the pong answer.
+
+Note: All properties must be set at runtime. Setting any properties in the properties window will have no effect in runtime mode.
+
+
+Version 1.3 BETA - 8/12/2021
+----------------------------------------------------------------------------
+1) Encoding data was flawed, it is now fixed and per standard rfc6455
+2) Added checking for most invalid characters in the URL (aka URI) passed to the Connect function.
+3) an html help file page has been added explaining parameters, arguments, methods, events, properties, and enums, it is in the main directory as HELP.html.
+4) changed a few error codes and added some new ones to reflect industry standard accepted error codes, even though they are not all in the websocket standard rfc6455.
+5) almost all possible http error codes are now handled and identified. (huge function)
+6) added a onProgress event. This event could be used to implement a progress bar or status on large sends. It will only activate on data larger than 4kb.
+7) Added a isBusy property. Check this read-only property to see if the websocket is busy. if it is TRUE the websocket is in the process of sending or recieving data.
+
+8) Added support for compression, and thus another wqweto class (cZipArchive) which handles deflate/inflate. use the UseCompression property before connecting to activate.
+   The server must support compression in order to use it. After connecting you can enable/disable compression as needed, for example: to send a binary message.
+   If you plan on using compression at all, you MUST set useCompression to True BEFORE connecting so that the proper Extension header is negotiated. Otherwise
+   the websocket will not compress the data if the server has not accepted the extension, even if useCompression is True. 
+
+9) Added support for extensions in the Connect() function, these work the same as sub-protocols, but reminder that the websocket handles deflate compression internally. see 9)
+    You could implement your own compression sending deflate algo by using byte arrays and sending in binary mode. Fill in the ProtocolExtensions parameter with the desired extension(s).
+    These are in the same format as the SubProtocols parameter (CSV). Check Extensions property after connecting to see if the server accepted your extension. 
+    Currently only 2 extensions are registered with IANA - BBF USP protocol (for IOT devices) and permessage-deflate but more are in the works.
+
+10) Cleaned up the websocket interface for some private internal functions that were exposed.
+11) Fixed several Off-By-One errors in packet splitting functions, hopefully they are all fixed. Working with arrays is error-prone and complex going from C to VB and back.
+    As usual if you find any errors please report to the vbforums post.
+
+Known Issues:
+1) Proxies are not supported, will probably/maybe add support in a future update.
+2) There are several features (such as compression) that have not been tested because I cant find a server to test them with, but in theory they should work so long as the code is correct.
+
+
+Version 1.2 BETA - 8/4/2021
+----------------------------------------------------------------------------
+1) added ability to include custom headers in the initial GET header request through a optional collection in Connect() params
+2) removed default echo sub-protocol and fixed an internal bug with formatting subprotocols
+3) If no protocols are specified, the header Sec-Websocket-Protocol is no longer included in the header
+4) added handling of the 426 - "Websocket protocol not supported" http code to the header inspector
+5) On top of handling fragmented packets, Now handles incoming buffers with multiple packets stacked back to back in the same buffer
+6) now handles Close frames from the server that have an error code attached
+
+
+
+Version 1.1 BETA - 8/3/2021
+----------------------------------------------------------------------------
+1) optimized Base64 encoder for speed
+2) optimized UrlEncode_UTF8 for speed
+3) added support for incoming and outgoing packets up to MAX_LONG in size (2.1 Gb)
+4) Added full support for sub-protocols in connect function
+5) added Protocols property that reflects server accepted protocols
+6) Added full support for fragmented Websocket Frames
+7) Added full support for winsock fragmented data buffering with large data packets
+8) various small code and logic optimizations
+

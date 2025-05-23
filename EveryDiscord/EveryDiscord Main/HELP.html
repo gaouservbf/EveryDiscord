@@ -1,0 +1,782 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<title>VBWebsocket Help</title>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+
+</head>
+
+<body>
+<p><font size="5" face="Arial, Helvetica, sans-serif"><strong>VBWebsocket Help 
+  File</strong></font></p>
+<p><font face="Arial, Helvetica, sans-serif"><strong>Introduction</strong><br />
+  <br />
+  VBWebsocket is a client side websocket implemented as a VB6 UserControl, and 
+  is the first open VB6 client websocket <em>UserControl</em> implementation to 
+  support both standard and secure connections using SSL/TLS. The API loosely 
+  follows the Java implementation and code flow. It currently supports websocket 
+  protocol 13 as specified in the <a href="https://www.rfc-editor.org/rfc/rfc6455.txt" target="_blank">rfc6455</a> 
+  of the websocket standard. Some accomodations were made for servers that use 
+  none-standard behavior but are mostly industry wide accepted practices. It is 
+  presented as Open Source for a starting point to implement your own as needed 
+  or can be easily used as is. Each VBWebsocket instance represents 1 connection 
+  to a websocket server. Multiple connections can be made by using control arrays 
+  or citing several VBWebsocket controls on your form as needed. Or if you're 
+  feeling motivated the source code could be altered to support multiple connections.<br />
+  <br />
+  Best practices would suggest that you use the code in your project without compiling 
+  to ocx to avoid collisions with other possibly compiled VBWebsocket ocx controls 
+  by someone else. If you choose to compile to ocx you should rename it to something 
+  else besides VBWebsocket.ocx. Also keeping the ocx in your app folder will help 
+  avoid collisions. The files you will need to include in your project are the 
+  exact same ones included in the project example.<br />
+  <br />
+  This help file is in a state of flux and will probably change in the future 
+  with additions and edits. <br />
+  <br />
+  <strong>Credits</strong><br />
+  <br />
+  VBWebsocket uses technology developed by Vladimir Vissoultchev aka wqweto (wqweto@gmail.com) 
+  from his <a href="https://github.com/wqweto/VbAsyncSocket" target="_blank">VBAsyncSocket</a> 
+  project for a SSL/TLS socket implementation. Some code contributions were translated 
+  from a chinese blog site by a user named Youran (ur1986@foxmail.com) at <a href="https://www.cnblogs.com/xiii/p/7135233.html" target="_blank">https://www.cnblogs.com/xiii/p/7135233.html</a>. 
+  This project would not have been possible without thier contributions. As noted 
+  previously, the rfc standard rfc6455 was followed. Some code from <a href="https://www.di-mgt.com.au/howto-convert-vba-unicode-to-utf8.html" target="_blank">DI 
+  Systems</a> website was followed for UTF8 encoding in VB6. Most of the code 
+  in mWebsocket.bas and Websocket.ctl was created or heavily modified by the author 
+  (me). Also a <a href="https://www.vbforums.com" target="_blank">vbForums</a> 
+  user named Maatooh created the first VB6 class based secure websocket, see the 
+  link below for his project.<br />
+  <br />
+  If you find any bugs, errors, or have suggestions or comments please feel free 
+  to email me at dethbomb@hotmail.com or visit the <a href="https://www.vbforums.com/showthread.php?892835-VB6-Visual-Basic-6-Client-Websocket-Control-1-7-BETA" target="_blank">vbforums 
+  post</a>.<br />
+  </font></p>
+<p><font face="Arial, Helvetica, sans-serif"><strong>Links</strong></font></p>
+<p><font face="Arial, Helvetica, sans-serif">VBForums VBWebsocket Post:<br />
+  <a href="https://www.vbforums.com/showthread.php?892835-VB6-Visual-Basic-6-Client-Websocket-Control" target="_blank">https://www.vbforums.com/showthread.php?892835-VB6-Visual-Basic-6-Client-Websocket-Control</a><br />
+  <br />
+  Websocket Protocol Standard<br />
+  <a href="https://www.rfc-editor.org/rfc/rfc6455.txt">https://www.rfc-editor.org/rfc/rfc6455.txt 
+  </a><br />
+  <br />
+  Deflate Compression Standard<br />
+  <a href="https://www.rfc-editor.org/rfc/rfc7692.txt">https://www.rfc-editor.org/rfc/rfc7692.txt<br />
+  </a><br />
+  wqweto VBAsyncSocket Project<br />
+  <a href="https://github.com/wqweto/VbAsyncSocket">https://github.com/wqweto/VbAsyncSocket 
+  </a><br />
+  <br />
+  IANA Websocket Registry<br />
+  <a href="https://www.iana.org/assignments/websocket/websocket.xml">https://www.iana.org/assignments/websocket/websocket.xml 
+  </a><br />
+  <br />
+  Maatooh VB6 WSS Websocket project<br />
+  </font><font face="Arial, Helvetica, sans-serif"><a href="https://github.com/Maatooh/TlsSocketWSS-vb6" target="_blank">https://github.com/Maatooh/TlsSocketWSS-vb6</a><br />
+  <br />
+  <strong>Index</strong><br />
+  </font> </p>
+<table border="0" align="left" cellpadding="4" cellspacing="4">
+  <tr> 
+    <td width="246" bgcolor="#CCCCCC"> <div align="center"><font size="4" face="Arial, Helvetica, sans-serif"><strong><a href="#Methods">Methods</a></strong></font></div></td>
+    <td width="324" bgcolor="#CCCCCC"> <div align="center"><font size="4" face="Arial, Helvetica, sans-serif"><strong><a href="#Events">Events</a></strong></font></div></td>
+    <td width="241" bgcolor="#CCCCCC"><div align="center"><font size="4" face="Arial, Helvetica, sans-serif"><strong><a href="#Enums">Enums</a></strong></font></div></td>
+    <td width="241" bgcolor="#CCCCCC"> <div align="center"><font size="4" face="Arial, Helvetica, sans-serif"><strong><a href="#Properties">Properties</a></strong></font></div></td>
+  </tr>
+  <tr> 
+    <td valign="top"> <div align="center"><font size="3" face="Arial, Helvetica, sans-serif"><a href="#Connect">Connect</a><br />
+        <a href="#Disconnect">DisConnect</a><br />
+        <a href="#Send">Send</a><br />
+        <a href="#GetStatusCodeText">GetStatusCodeText </a><br />
+        <a href="#Ping">Ping</a> <br />
+        <a href="#SendAdvanced" target="_self">SendAdvanced</a></font></div></td>
+    <td valign="top"> 
+      <div align="center"><font size="3" face="Arial, Helvetica, sans-serif"><a href="#onMessage">onMessage</a><br />
+        <a href="#onError">onError</a><br />
+        <a href="#onConnect">onConnect</a><br />
+        <a href="#onClose">onClose</a> <br />
+        <a href="#onProgress">onProgress</a> <br />
+        <a href="#onPong">onPong</a> <br />
+        <a href="#onReConnect" target="_self">onReConnect </a></font></div></td>
+    <td valign="top"><div align="center"><font size="3" face="Arial, Helvetica, sans-serif"><a href="#WebSocketStatus">WebSocketStatus</a><br />
+        <a href="#WebsocketState">WebsocketState</a> <br />
+        <a href="#opCode"> WebsocketOpCode</a> </font></div></td>
+    <td valign="top"> 
+      <div align="center"><font size="3" face="Arial, Helvetica, sans-serif"><a href="#readyState">readyState</a><br />
+        <a href="#Protocols">Protocols</a><br />
+        <a href="#UseCompression">UseCompression</a> <br />
+        <a href="#isBusy">isBusy</a> <br />
+        <a href="#Extensions">Extensions</a><br />
+        <a href="#ChunkSize">ChunkSize</a> </font></div></td>
+  </tr>
+</table>
+<p><font face="Arial, Helvetica, sans-serif"><br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <font size="4"><strong>METHODS</strong></font><a name="Methods" id="Methods"></a></font></p>
+<p><font face="Arial, Helvetica, sans-serif"> <code><em><font size="3">Pub<a href="https://www.rfc-editor.org/rfc/rfc6455.txt">l</a>ic 
+  Sub <strong>Connect</strong><a name="Connect" id="Connect"></a>(ByVal Uri As 
+  String, Optional ByVal Port As String, Optional ByVal SubProtocols As String, 
+  Optional ByVal ProtocolExtensions As String, Optional Headers As Collection)</font></em><br />
+  <br />
+  </code>The Connect method is used to initiate a connection to a websocket server. 
+  example: <code>ws.Connect(&quot;wss://echo.websocket.org&quot;)</code></font></p>
+<table width="94%" border="1">
+  <tr> 
+    <td width="10%" bgcolor="#CCCCCC"> <div align="center"><font face="Arial, Helvetica, sans-serif"><strong>Arguments</strong></font></div></td>
+    <td width="12%" bgcolor="#CCCCCC"><div align="center"><font face="Arial, Helvetica, sans-serif"><strong>Required</strong></font></div></td>
+    <td width="10%" bgcolor="#CCCCCC"><div align="center"><font face="Arial, Helvetica, sans-serif"><strong>Type</strong></font></div></td>
+    <td width="68%" bgcolor="#CCCCCC"> <div align="center"><font face="Arial, Helvetica, sans-serif"><strong>Description</strong></font></div></td>
+  </tr>
+  <tr> 
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif"><em>Uri</em></font></div></td>
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif">required</font></div></td>
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif">String</font></div></td>
+    <td><font face="Arial, Helvetica, sans-serif">The URI (aka URL) of the websocket 
+      server. This should be in the form of: <br />
+      <strong>ws[s]://serveraddress.com[:port][/path][?param=value]</strong><br />
+      (items in brackets are optional) if the server is a SSL connection you should 
+      use <em><strong>wss://</strong></em> and port 443, if its a non-secure connection 
+      you should use <em><strong>ws:// </strong></em>and port 80 (or the port 
+      required by the server)</font></td>
+  </tr>
+  <tr> 
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif">[<em>Port</em>]</font></div></td>
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif">optional</font></div></td>
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif">String</font></div></td>
+    <td><font face="Arial, Helvetica, sans-serif">if the port isnt specified in 
+      the url then you can pass a port with this parameter. If no ports are specified 
+      VBWebsocket uses port 80 for ws:// urls and port 443 for wss:// urls. A 
+      port specified in the URL overrides all other ports specified.</font></td>
+  </tr>
+  <tr> 
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif">[<em>SubProtocols</em>]</font></div></td>
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif">optional</font></div></td>
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif">String</font></div></td>
+    <td><font face="Arial, Helvetica, sans-serif">Use this parameter to specify 
+      the desired high level protocol(s) you want to use. Use a string in a CSV 
+      (comma separated values) format aka &quot;MQTT, WAMP, JSON&quot;. After 
+      connection check the <a href="#Protocols" target="_self">Protocols</a> property 
+      to see which protocols the server accepted.</font></td>
+  </tr>
+  <tr> 
+    <td><div align="center"><font size="3" face="Arial, Helvetica, sans-serif">[<em>ProtocolExtensions</em>]</font></div></td>
+    <td><div align="center"><font size="3" face="Arial, Helvetica, sans-serif">optional</font></div></td>
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif"><font size="3">String</font></font></div></td>
+    <td><font face="Arial, Helvetica, sans-serif">Use this parameter to specify 
+      the desired Protocol extension(s) you want to use. Use a string in a CSV 
+      (comma separated values) format aka &quot;permessage-deflate, bbf-usp-protocol&quot;. 
+      Note: the compression extension is handled internally by the websocket. 
+      Use the UseCompression property before connecting to enable. Check the IANA 
+      websocket registry page for official extensions.</font></td>
+  </tr>
+  <tr> 
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif">[<em>Headers</em>]</font></div></td>
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif">optional</font></div></td>
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif">Collection</font></div></td>
+    <td><font face="Arial, Helvetica, sans-serif">This is a collection of additional 
+      optional header lines such as <strong>&quot;Content-Type: application/json&quot;</strong>. 
+      Specify only the header line, VBWebsocket takes care of any formatting such 
+      as adding line feeds. See the piesocket example in the sample code for an 
+      example useage.</font></td>
+  </tr>
+</table>
+<br />
+<hr />
+<p><font size="3" face="Arial, Helvetica, sans-serif"><code> <em>Public Sub <strong>Disconnect</strong></em><a name="Disconnect" id="Disconnect"></a>()</code></font> 
+</p>
+<p><font face="Arial, Helvetica, sans-serif">Use this method to disconnect from 
+  a websocket server. example:<code> ws.Disconnect</code></font></p>
+<hr />
+<p><font face="Arial, Helvetica, sans-serif"><code><em><font size="3">Public Function 
+  <strong>GetStatusCodeText</strong><a name="GetStatusCodeText" id="GetStatusCodeText"></a>(ByVal 
+  statCode As <a href="#WebSocketStatus">WebsocketStatus</a>) As String</font></em><br />
+  <br />
+  </code> Use this to get a friendly error message from a status code or error 
+  number.<code> </code>Most times this will be the same as <a href="#onError">reason</a> 
+  parameter in the <a href="#onError">onError</a> event (unless it is a winsock 
+  error).</font></p>
+<table width="94%" border="1">
+  <tr> 
+    <td width="10%" bgcolor="#CCCCCC"> <div align="center"><font face="Arial, Helvetica, sans-serif"><strong>Arguments</strong></font></div></td>
+    <td width="12%" bgcolor="#CCCCCC"><div align="center"><font face="Arial, Helvetica, sans-serif"><strong>Required</strong></font></div></td>
+    <td width="11%" bgcolor="#CCCCCC"><div align="center"><font face="Arial, Helvetica, sans-serif"><strong>Type</strong></font></div></td>
+    <td width="67%" bgcolor="#CCCCCC"> <div align="center"><font face="Arial, Helvetica, sans-serif"><strong>Description</strong></font></div></td>
+  </tr>
+  <tr> 
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif"><em>statcode</em></font></div></td>
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif">required</font></div></td>
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif"><a href="#WebSocketStatus">WebSocketStatus</a></font></div></td>
+    <td><font face="Arial, Helvetica, sans-serif">This can be a value from the 
+      WebSocketStatus enum or a Long error value. </font></td>
+  </tr>
+</table>
+<br />
+<hr />
+<p><font face="Arial, Helvetica, sans-serif"><code> <font size="3">Public Sub 
+  <em> <strong>Send</strong></em><a name="Send" id="Send"></a>(ByVal Data As Variant, 
+  Optional ByVal NoUTF8Conversion As Boolean)</font></code><br />
+  <br />
+  Use this method to send data to a websocket server. ex: <code>ws.Send(&quot;Hello 
+  World!&quot;) <br />
+  </code>By default VBWebsocket now sends everything as Text. If you need to send 
+  as Binary, use a Byte Array. If you use a byte array VBWebsocket will automatically 
+  send the Data as untouched binary data. If you send a String, VBWebsocket will 
+  send as Text encoded in UTF8. Use byte arrays for files, pictures, media objects 
+  etc. NEW: you can now send binary strings by setting the extra parameter NoUTF8Conversion 
+  to true. This allows you to use strings to load binary files instead of byte 
+  arrays. under the hood the websocket will convert your string to a byte array 
+  &nbsp;(as-is not with strconv)&nbsp; and send as binary.</font></p>
+<table width="94%" border="1">
+  <tr> 
+    <td width="10%" bgcolor="#CCCCCC"> <div align="center"><font face="Arial, Helvetica, sans-serif"><strong>Arguments</strong></font></div></td>
+    <td width="12%" bgcolor="#CCCCCC"><div align="center"><font face="Arial, Helvetica, sans-serif"><strong>Required</strong></font></div></td>
+    <td width="11%" bgcolor="#CCCCCC"><div align="center"><font face="Arial, Helvetica, sans-serif"><strong>Type</strong></font></div></td>
+    <td width="67%" bgcolor="#CCCCCC"> <div align="center"><font face="Arial, Helvetica, sans-serif"><strong>Description</strong></font></div></td>
+  </tr>
+  <tr> 
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif"><em>Data</em></font></div></td>
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif">required</font></div></td>
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif">Variant</font></div></td>
+    <td><font face="Arial, Helvetica, sans-serif">On most websocket servers this 
+      will be a string formatted as JSON, XML or plain text. The server you are 
+      connecting to, and the application layer protocol you agreed to, determines 
+      what and how the data is formatted before you send it. NOTE: This parameter 
+      has been changed from String to Variant to allow for sending Byte Arrays 
+      as a Binary websocket message. Use strings when sending formatted data such 
+      as JSON, XML or plain text, Use Byte Arrays when sending files, picture 
+      data, or media objects etc. By default VBWebsocket now sends all data as 
+      Text encoded in UTF8.</font></td>
+  </tr>
+  <tr> 
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif"><em>NoUTF8Conversion</em></font></div></td>
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif">Optional</font></div></td>
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif">Boolean</font></div></td>
+    <td><font face="Arial, Helvetica, sans-serif">you can set this optional parameter 
+      to True if you want to send a string as binary without UTF8 encoding. Use 
+      this for sending Binary strings only such as those loaded from a file, this 
+      parameter has no effect on byte arrays. If you set this parameter to true 
+      and data is not a string an error will occur.</font></td>
+  </tr>
+</table>
+<p><font face="Arial, Helvetica, sans-serif"><br />
+  </font></p>
+<hr />
+<p><font face="Arial, Helvetica, sans-serif"><code> <font size="3">Public Sub 
+  <em> <strong>SendAdvanced</strong></em><a name="SendAdvanced" id="SendAdvanced"></a>(ByVal 
+  Data As Variant, ByVal OpCode As Long, ByVal blnUTF8Encode As Boolean, Optional 
+  ByVal blnCompressData As Boolean, Optional ByVal blnSetFinBit As Boolean = True, 
+  Optional ByVal RSV1 As Boolean, Optional ByVal RSV2 As Boolean, Optional ByVal 
+  RSV3 As Boolean)<br />
+  </font></code><br />
+  This procedure was added to allow for sending extension data. It gives you fine 
+  grained control over how the websocket message is constructed. Some of the same 
+  rules apply as the regular Send() function,for example: if you specify blnUTF8Encode 
+  then the data should be a text string (or a byte array directly assigned from 
+  a string) or else it will be treated as a binary string. Also if you specify 
+  compression you must have set the UseCompression option to true before connecting. 
+  If you specify compression then RSV1 will be set to true by the websocket. Also 
+  Data can only be a byte array or a string. Empty data can be sent.<br />
+  <br />
+  <code><br />
+  </code></font></p>
+<table width="94%" border="1">
+  <tr> 
+    <td width="10%" bgcolor="#CCCCCC"> <div align="center"><font face="Arial, Helvetica, sans-serif"><strong>Arguments</strong></font></div></td>
+    <td width="12%" bgcolor="#CCCCCC"><div align="center"><font face="Arial, Helvetica, sans-serif"><strong>Required</strong></font></div></td>
+    <td width="11%" bgcolor="#CCCCCC"><div align="center"><font face="Arial, Helvetica, sans-serif"><strong>Type</strong></font></div></td>
+    <td width="67%" bgcolor="#CCCCCC"> <div align="center"><font face="Arial, Helvetica, sans-serif"><strong>Description</strong></font></div></td>
+  </tr>
+  <tr> 
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif"><em>Data</em></font></div></td>
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif">required</font></div></td>
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif">Variant</font></div></td>
+    <td><font face="Arial, Helvetica, sans-serif">Byte Array or String data.</font></td>
+  </tr>
+  <tr> 
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif"><em>OpCode</em></font></div></td>
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif">required</font></div></td>
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif">Long</font></div></td>
+    <td><font face="Arial, Helvetica, sans-serif">Specify the opCode. You can 
+      use the built in opCodes or an extension opCode 3-7, 11-15. any other opcode 
+      will cause an error.</font></td>
+  </tr>
+  <tr> 
+    <td><div align="center"><em><font face="Arial, Helvetica, sans-serif">blnUTF8Encode</font></em></div></td>
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif">optional</font></div></td>
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif">Boolean</font></div></td>
+    <td><font face="Arial, Helvetica, sans-serif">Set to True if you wish to have 
+      the websocket encode the data in UTF8 for a String (or Textual) data. The 
+      websocket expects a String or Byte Array to be a Native VB6 String encoded 
+      in UTF16. If you specify any other type of data with this flag, the data 
+      will be corrupted.</font></td>
+  </tr>
+  <tr> 
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif"><em>blnCompressData</em></font></div></td>
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif">optional</font></div></td>
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif">Boolean</font></div></td>
+    <td><font face="Arial, Helvetica, sans-serif">Set to True if you wish the 
+      websocket to compress the data before sending. You must have set UseCompression 
+      to true before connecting and the server must have accepted the compression 
+      extension in order to use compression. If you use this compression flag, 
+      the websocket will automatically set RSV1 to true. You can optionally compress 
+      the data yourself and set RSV1 to true if you wish.</font></td>
+  </tr>
+  <tr> 
+    <td><div align="center"><em><font face="Arial, Helvetica, sans-serif">blnSetFinBit</font></em></div></td>
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif">optional</font></div></td>
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif">Boolean</font></div></td>
+    <td><font face="Arial, Helvetica, sans-serif">Set this to False if you dont 
+      want the FIN bit set. This is by default True. Normally you only set this 
+      to false on opContinue frames.</font></td>
+  </tr>
+  <tr> 
+    <td><div align="center"><em><font face="Arial, Helvetica, sans-serif">RSV1</font></em></div></td>
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif">optional</font></div></td>
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif">Boolean</font></div></td>
+    <td><font face="Arial, Helvetica, sans-serif">This is normally reserved for 
+      compressed frames or messages. Set to true if data is already compressed. 
+      Do not set this if you specify the blnCompressData flag as the websocket 
+      will set this automatically.</font></td>
+  </tr>
+  <tr> 
+    <td><div align="center"><em><font face="Arial, Helvetica, sans-serif">RSV2</font></em></div></td>
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif">optional</font></div></td>
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif">Boolean</font></div></td>
+    <td><font face="Arial, Helvetica, sans-serif">reserved for use by extensions</font></td>
+  </tr>
+  <tr> 
+    <td><div align="center"><em><font face="Arial, Helvetica, sans-serif">RSV3</font></em></div></td>
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif">optional</font></div></td>
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif">Boolean</font></div></td>
+    <td><font face="Arial, Helvetica, sans-serif">reserved for use by extensions</font></td>
+  </tr>
+</table>
+<p><font face="Arial, Helvetica, sans-serif"><br />
+  </font></p>
+<p><font face="Arial, Helvetica, sans-serif"><br />
+  <font size="4"><code>Public Sub Ping<a name="Ping" id="Ping"></a>(Optional ByVal 
+  ExtraMsg As String)</code></font><br />
+  <br />
+  Ping the server, an option message can be included such as &quot;Hello&quot;. 
+  If the server answers the <a href="#onPong">onPong</a> event will be raised.<br />
+  </font></p>
+<p><br />
+  <br />
+  <br />
+</p>
+<font face="Arial, Helvetica, sans-serif"><strong><font size="4">EVENTS</font><font size="5"><a name="Events" id="Events"></a></font></strong></font> 
+<p><font face="Arial, Helvetica, sans-serif"> <code><font size="3">Event <em><strong>onMessage</strong></em><a name="onMessage" id="onMessage"></a>(ByVal 
+  Msg As Variant</font><font size="3">)</font><br />
+  <br />
+  </code>This event happens when the server sends data to the websocket.</font></p>
+<table width="94%" border="1">
+  <tr> 
+    <td width="10%" bgcolor="#CCCCCC"> <div align="center"><font face="Arial, Helvetica, sans-serif"><strong>Parameters</strong></font></div></td>
+    <td width="11%" bgcolor="#CCCCCC"><div align="center"><font face="Arial, Helvetica, sans-serif"><strong>Type</strong></font></div></td>
+    <td width="67%" bgcolor="#CCCCCC"> <div align="center"><font face="Arial, Helvetica, sans-serif"><strong>Description</strong></font></div></td>
+  </tr>
+  <tr> 
+    <td><div align="center"><font face="Courier New, Courier, mono"><em>Msg</em></font></div></td>
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif">Variant</font></div></td>
+    <td><font face="Arial, Helvetica, sans-serif">On most websocket servers this 
+      will be a string formatted in JSON, XML or plain text. The server you are 
+      connecting to determines what and how the data is formatted before you recieve 
+      it. NOTE: this option has been changed from String to Variant in order to 
+      support multiple formats. If the server indicates that the Data is binary, 
+      Msg will contain a byte array, otherwise it will contain a string. Check 
+      the <font face="Courier New, Courier, mono">opCode </font>parameter to see 
+      what type of data the message contains. You can also use the built in VarType(Msg) 
+      function to determine if Msg contains a byte array or string. See the sample 
+      code for an example.</font></td>
+  </tr>
+  <tr> 
+    <td><div align="center"><font face="Courier New, Courier, mono"><em>opCode</em></font></div></td>
+    <td><div align="center"><a href="#opCode">WebsocketOpCode</a></div></td>
+    <td><font face="Arial, Helvetica, sans-serif">If this parameter is opText 
+      - 1 the <font face="Courier New, Courier, mono">Msg</font> parameter is 
+      a text string , if it is opBinary-2 it is a byte array. if it is 3-7 or 
+      11-15 it is extension data and Msg is formatted in a raw untouched byte 
+      array(not decompressed either) </font></td>
+  </tr>
+</table>
+<br />
+<hr />
+<p><font face="Arial, Helvetica, sans-serif"><code> <font size="3">Event <em><strong>onConnect</strong></em><a name="onConnect" id="onConnect"></a>(ByVal 
+  RemoteHost As String, Byval RemoteIP as String, ByVal RemotePort As String)</font><br />
+  <br />
+  </code>This event occurrs whenever the websocket makes a successful connection 
+  to a websocket server.</font></p>
+<table width="94%" border="1">
+  <tr> 
+    <td width="10%" bgcolor="#CCCCCC"> <div align="center"><font face="Arial, Helvetica, sans-serif"><strong>Parameters</strong></font></div></td>
+    <td width="11%" bgcolor="#CCCCCC"><div align="center"><font face="Arial, Helvetica, sans-serif"><strong>Type</strong></font></div></td>
+    <td width="67%" bgcolor="#CCCCCC"> <div align="center"><font face="Arial, Helvetica, sans-serif"><strong>Description</strong></font></div></td>
+  </tr>
+  <tr> 
+    <td><div align="center"><em><font face="Arial, Helvetica, sans-serif">RemoteHost</font></em></div></td>
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif">String</font></div></td>
+    <td><font face="Arial, Helvetica, sans-serif">The resolved remote host name 
+      of the websocket server you are connected to. </font></td>
+  </tr>
+  <tr> 
+    <td><div align="center"><em><font size="3" face="Arial, Helvetica, sans-serif">RemoteIP</font></em></div></td>
+    <td><div align="center"><font size="3" face="Arial, Helvetica, sans-serif">String</font></div></td>
+    <td><font size="3" face="Arial, Helvetica, sans-serif">The IP address of the 
+      remote host.</font></td>
+  </tr>
+  <tr> 
+    <td><div align="center"><em><font face="Arial, Helvetica, sans-serif">RemotePort</font></em></div></td>
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif">String</font></div></td>
+    <td><font face="Arial, Helvetica, sans-serif">The remote port of the websocket 
+      server you are connected to. </font></td>
+  </tr>
+</table>
+<br />
+<hr />
+<p><font face="Arial, Helvetica, sans-serif"><code><br />
+  <font size="3">Event <em><strong>onClose</strong></em><a name="onClose" id="onClose"></a>(ByVal 
+  eCode As <a href="#WebsocketStatus">WebsocketStatus</a>, ByVal reason As String)</font><br />
+  <br />
+  </code>This event happens whenever the connection is closed to the remote server. 
+  <em>eCode</em> and <em>reason</em> will be the same as the <a href="#onError">onError</a> 
+  event.</font></p>
+<table width="94%" border="1">
+  <tr> 
+    <td width="10%" bgcolor="#CCCCCC"> <div align="center"><font face="Arial, Helvetica, sans-serif"><strong>Parameters</strong></font></div></td>
+    <td width="11%" bgcolor="#CCCCCC"><div align="center"><font face="Arial, Helvetica, sans-serif"><strong>Type</strong></font></div></td>
+    <td width="67%" bgcolor="#CCCCCC"> <div align="center"><font face="Arial, Helvetica, sans-serif"><strong>Description</strong></font></div></td>
+  </tr>
+  <tr> 
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif"><em>eCode</em></font></div></td>
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif"><a href="#WebsocketStatus">WebsocketStatus</a></font></div></td>
+    <td><font face="Arial, Helvetica, sans-serif">A error code generated by the 
+      server. You can use the function GetStatusCodeText(eCode) function to get 
+      an error description which is usually the same as reason. See the <a href="#onError">onError 
+      </a>event for more descriptions of error codes and their meanings.</font></td>
+  </tr>
+  <tr> 
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif"><em>reason</em></font></div></td>
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif">String</font></div></td>
+    <td><font face="Arial, Helvetica, sans-serif">A user friendly error description 
+      of the error that occurred. You can also use <a href="#GetStatusCodeText">GetStatusCodeText</a> 
+      function with the <em>eCode</em> to get a error description.</font></td>
+  </tr>
+</table>
+<br />
+<hr />
+<p><font face="Arial, Helvetica, sans-serif"> <br />
+  <code><font size="3">Event <em><strong>onError</strong></em><a name="onError" id="onError"></a>(ByVal 
+  eCode As WebsocketStatus, ByVal reason As String)</font></code><br />
+  <br />
+  This event happens whenever an error occurs. <em>eCode</em> is the error number 
+  while<em> reason</em> is a friendly description of the error. <br />
+  <br />
+  <code>000-999 &nbsp;&nbsp;&nbsp;&nbsp;unused by websocket, an error in this 
+  range will most likely be an internal VB error, such as 5-invalid argument<br />
+  1000-1015&nbsp;&nbsp;&nbsp;standard websocket errors aka Close Codes<br />
+  1016 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;trapped socket error</code></font><font face="Arial, Helvetica, sans-serif"><code>s<br />
+  1017-1999 &nbsp;&nbsp;unused or OS (Windows) error<br />
+  2000-2999&nbsp;&nbsp;&nbsp;Websocket Extension errors<br />
+  3000-3999&nbsp;&nbsp;&nbsp;Library or Framework errors<br />
+  4000-4999 &nbsp;&nbsp;Application Layer errors<br />
+  5000-10000 &nbsp;unused or OS (Windows) error<br />
+  &gt; 10,000 &nbsp;&nbsp;&nbsp;untrapped Winsock errors<br />
+  </code> </font></p>
+<table width="94%" border="1">
+  <tr> 
+    <td width="10%" bgcolor="#CCCCCC"> <div align="center"><font face="Arial, Helvetica, sans-serif"><strong>Parameters</strong></font></div></td>
+    <td width="11%" bgcolor="#CCCCCC"><div align="center"><font face="Arial, Helvetica, sans-serif"><strong>Type</strong></font></div></td>
+    <td width="67%" bgcolor="#CCCCCC"> <div align="center"><font face="Arial, Helvetica, sans-serif"><strong>Description</strong></font></div></td>
+  </tr>
+  <tr> 
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif"><em>eCode</em></font></div></td>
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif"><a href="#WebsocketStatus">WebsocketStatus</a></font></div></td>
+    <td><font face="Arial, Helvetica, sans-serif">A error code generated by the 
+      websocket. This can also be an underlying winsock error. If code is 1016 
+      (WebsocketStatus.WinsockError) then it is an internal socket or winsock 
+      error. You can use the function GetStatusCodeText(eCode) function to get 
+      an error description which is usually the same as reason.</font></td>
+  </tr>
+  <tr> 
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif"><em>reason</em></font></div></td>
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif">String</font></div></td>
+    <td><font face="Arial, Helvetica, sans-serif">A user friendly error description 
+      of the error that occurred. You can also use <a href="#GetStatusCodeText">GetStatusCodeText</a> function with the eCode to get a error description.</font></td>
+  </tr>
+</table>
+<br />
+<hr />
+<br />
+<p><font face="Arial, Helvetica, sans-serif"> <code><font size="3">Event <em><strong>onProgress</strong></em><a name="onProgress" id="onProgress"></a></font></code>(ByVal 
+  bytesSent As Long, ByVal bytesMax As Long, Cancel As Boolean)<code><br />
+  <br />
+  </code>This event occurrs whenever the websocket is making large data sends 
+  greater than 4kb to the server. You can set the byref Cancel parameter to True 
+  to cancel the send. <br />
+  To get bytesRemaining use (bytesMax - bytesSent). <br />
+  When bytesSent = bytesMax then the send is complete.</font></p>
+<table width="94%" border="1">
+  <tr> 
+    <td width="10%" bgcolor="#CCCCCC"> <div align="center"><font face="Arial, Helvetica, sans-serif"><strong>Parameters</strong></font></div></td>
+    <td width="11%" bgcolor="#CCCCCC"><div align="center"><font face="Arial, Helvetica, sans-serif"><strong>Type</strong></font></div></td>
+    <td width="67%" bgcolor="#CCCCCC"> <div align="center"><font face="Arial, Helvetica, sans-serif"><strong>Description</strong></font></div></td>
+  </tr>
+  <tr> 
+    <td><div align="center"><em><font face="Arial, Helvetica, sans-serif">bytesSent</font></em></div></td>
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif">Long</font></div></td>
+    <td><font face="Arial, Helvetica, sans-serif">The number of bytes that have 
+      been sent in the current message</font></td>
+  </tr>
+  <tr> 
+    <td><div align="center"><em><font size="3" face="Arial, Helvetica, sans-serif">bytesMax</font></em></div></td>
+    <td><div align="center"><font size="3" face="Arial, Helvetica, sans-serif">Long</font></div></td>
+    <td><font size="3" face="Arial, Helvetica, sans-serif">the total number of 
+      bytes in the message</font></td>
+  </tr>
+  <tr> 
+    <td><div align="center"><em><font face="Arial, Helvetica, sans-serif">Cancel</font></em></div></td>
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif">Boolean</font></div></td>
+    <td><font face="Arial, Helvetica, sans-serif">A byref parameter that you can 
+      set to True to cancel the send.</font></td>
+  </tr>
+</table>
+<hr />
+<p><font face="Arial, Helvetica, sans-serif"><code><font size="3">Event <em><strong>onPong</strong></em><a name="onPong" id="onPong"></a>(ByVal 
+  IncludedMsg As String)</font><br />
+  <br />
+  </code>This event happens when the server answers a Ping message from the websocket. 
+  Sometimes the server may include an extra message such as &quot;Pong&quot; or 
+  &quot;Hello&quot;. </font></p>
+<table width="94%" border="1">
+  <tr> 
+    <td width="10%" bgcolor="#CCCCCC"> <div align="center"><font face="Arial, Helvetica, sans-serif"><strong>Parameters</strong></font></div></td>
+    <td width="11%" bgcolor="#CCCCCC"><div align="center"><font face="Arial, Helvetica, sans-serif"><strong>Type</strong></font></div></td>
+    <td width="67%" bgcolor="#CCCCCC"> <div align="center"><font face="Arial, Helvetica, sans-serif"><strong>Description</strong></font></div></td>
+  </tr>
+  <tr> 
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif"><em>IncludedMsg</em></font></div></td>
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif">String</font></div></td>
+    <td><font face="Arial, Helvetica, sans-serif">T</font><font face="Arial, Helvetica, sans-serif">he 
+      server may include an extra message such as &quot;Pong&quot; or &quot;Hello&quot; 
+      otherwise this will be an empty string. </font></td>
+  </tr>
+</table>
+<p><font face="Arial, Helvetica, sans-serif"><font size="4"><strong><br />
+  </strong></font></font></p>
+<hr />
+<p><font face="Arial, Helvetica, sans-serif"><code><br />
+  <font face="Arial, Helvetica, sans-serif"><code><font size="3"><a name="onReConnect" id="onReConnect"></a></font></code></font><font size="3">Event 
+  <em><strong>onReConnect</strong></em>(ByVal newURI As String)</font><br />
+  <br />
+  </code>This event happens whenever the connection is redirected by the remote 
+  server in the HTTP Handshake. The parameter newURI will have the redirect url 
+  value<em>.</em> This lets you update the URI in the GUI for the user.</font></p>
+<table width="94%" border="1">
+  <tr> 
+    <td width="10%" bgcolor="#CCCCCC"> <div align="center"><font face="Arial, Helvetica, sans-serif"><strong>Parameters</strong></font></div></td>
+    <td width="11%" bgcolor="#CCCCCC"><div align="center"><font face="Arial, Helvetica, sans-serif"><strong>Type</strong></font></div></td>
+    <td width="67%" bgcolor="#CCCCCC"> <div align="center"><font face="Arial, Helvetica, sans-serif"><strong>Description</strong></font></div></td>
+  </tr>
+  <tr> 
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif"><em>newURI</em></font></div></td>
+    <td><div align="center"><font face="Arial, Helvetica, sans-serif">String</font></div></td>
+    <td>The new Url that the connection is being directed to.</td>
+  </tr>
+</table>
+<br />
+<p><font face="Arial, Helvetica, sans-serif"><font size="4"><strong><br />
+  <br />
+  <br />
+  <br />
+  <br />
+  ENUMS</strong></font><a name="Enums" id="Enums"></a></font></p>
+<p><font face="Arial, Helvetica, sans-serif"><br />
+  <a name="WebsocketStatus" id="WebsocketStatus"></a>The <code>WebsocketStatus</code><code><a name="WebSocketStatus" id="WebSocketStatus"></a></code> 
+  enum is a list of error codes that are websocket specific. These are called 
+  Close codes because the connection is always closed after these errors.<br />
+  <br />
+  <code>Public Enum <em><strong>WebsocketStatus</strong></em><br />
+  &nbsp; NormalClosure = 1000<br />
+  &nbsp;&nbsp;GoingAway = 1001<br />
+  &nbsp;&nbsp;ProtocolError = 1002<br />
+  &nbsp; UnsupportedData = 1003<br />
+  &nbsp;&nbsp;StatusReserved = 1004<br />
+  &nbsp;&nbsp;NoStatusReceived = 1005<br />
+  &nbsp;&nbsp;AbNormalClosure = 1006<br />
+  &nbsp;&nbsp;InvalidData = 1007<br />
+  &nbsp;&nbsp;PolicyViolation = 1008<br />
+  &nbsp;&nbsp;MessageToLarge = 1009<br />
+  &nbsp;&nbsp;MandatoryExtension = 1010<br />
+  &nbsp;&nbsp;InternalError = 1011<br />
+  &nbsp;&nbsp;ServiceRestart = 1012<br />
+  &nbsp;&nbsp;TryAgainLater = 1013<br />
+  &nbsp;&nbsp;BadGateWay = 1014<br />
+  &nbsp;&nbsp;SslTlsHandshake = 1015&nbsp;<br />
+  End Enum</code></font></p>
+<hr />
+<p><font face="Arial, Helvetica, sans-serif"><a name="WebsocketState" id="WebsocketState"></a>The<code> 
+  WebsocketState<a name="WebSocketState" id="WebSocketState"></a></code> enum 
+  is a list of connection states the websocket is in. Check the <a href="#readyState">readyState</a> 
+  property to get current status.<br />
+  <br />
+  <code><font face="Courier New, Courier, mono">Public Enum <strong><em>WebSocketState</em></strong><br />
+  &nbsp;&nbsp;&nbsp;&nbsp;STATE_CLOSED</font></code></font><font face="Courier New, Courier, mono"><br />
+  <code>&nbsp;&nbsp;&nbsp;&nbsp;STATE_OPEN<br />
+  &nbsp;&nbsp;&nbsp;&nbsp;STATE_CONNECTING<br />
+  &nbsp;&nbsp;&nbsp;&nbsp;STATE_CLOSING<br />
+  End Enum</code></font></p>
+<p><font face="Arial, Helvetica, sans-serif"><br />
+  </font></p>
+<hr />
+<p><font face="Arial, Helvetica, sans-serif"><font face="Courier New, Courier, mono"><a name="opCode" id="opCode"></a><br />
+  this enum defines the websocket operation codes aka op codes, op codes 3-7 and 
+  11-15 are extension codes and data must be handled by the application, any other 
+  opcodes are invalid.<br />
+  <br />
+  Public Enum <em><strong>WebsocketOpCode</strong></em><br />
+  &nbsp;&nbsp;&nbsp;&nbsp; opContinue = 0&nbsp;&nbsp; ' successive message frame<br />
+  &nbsp;&nbsp;&nbsp;&nbsp; opText = 1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ' text 
+  message frame<br />
+  &nbsp;&nbsp;&nbsp;&nbsp; opBinary = 2&nbsp;&nbsp;&nbsp;&nbsp; ' binary message 
+  frame<br />
+  &nbsp;&nbsp;&nbsp;&nbsp; opClose = 8&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ' connection 
+  closing<br />
+  &nbsp;&nbsp;&nbsp;&nbsp; OpPing = 9&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ' ping 
+  heartbeat check<br />
+  &nbsp;&nbsp;&nbsp;&nbsp; opPong = 10&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ' ping heartbeat 
+  answer<br />
+  End Enum<br />
+  </font> </font></p>
+<p><font face="Arial, Helvetica, sans-serif"> <br />
+  <br />
+  <br />
+  <br />
+  <strong><font size="4">PROPERTIES</font></strong><a name="Properties" id="Properties"></a></font></p>
+<font face="Arial, Helvetica, sans-serif"><br />
+(<strong>Read-Only</strong>) <font size="4"><code>Property <strong>Get</strong> 
+<em>readyState<a name="readyState" id="readyState"></a></em>() As WebSocketState</code></font><br />
+</font> 
+<p><font face="Arial, Helvetica, sans-serif">Read the readystate property for 
+  information on the current connection state of the websocket. See the <a href="#WebsocketState">WebsocketState</a> 
+  enum for a list of possible values.<br />
+  </font></p>
+<hr />
+<p><font face="Arial, Helvetica, sans-serif"> (<strong>Read-Only</strong>) <font size="4"><code>Property 
+  <strong>Get</strong> <em>Protocols<a name="Protocols" id="Protocols"></a></em>() 
+  As String</code></font></font></p>
+<p><font face="Arial, Helvetica, sans-serif">Read this property to see what protocols 
+  the server has accepted from the SubProtocols you specified in the <a href="#Connect">Connect</a> 
+  method.</font><br />
+  <br />
+</p>
+<hr />
+<p><font face="Arial, Helvetica, sans-serif"> (<strong>Read-Only</strong>) <font size="4"><code>Property 
+  <strong>Get</strong> <em>Extensions<a name="Extensions" id="Extensions"></a></em>() 
+  As String</code></font></font></p>
+<p><font face="Arial, Helvetica, sans-serif">Read this property to see what Extensions 
+  the server has accepted from the ProtocolExtensions you specified in the <a href="#Connect">Connect</a> 
+  method.</font></p>
+<hr />
+<p><strong><font face="Arial, Helvetica, sans-serif">(Read-Write)</font></strong><font size="4"> 
+  <code>Property <strong>Let/Get</strong> <em>UseCompression</em><a name="UseCompression" id="UseCompression"></a>() 
+  As Boolean</code></font><br />
+  <br />
+  <font face="Arial, Helvetica, sans-serif">Set this property to send and recieve 
+  compressed data. Note that this is handled internally. You should not try to 
+  compress/decompress the data yourself (if you use this property), as it will 
+  result in data corruption.</font></p>
+<hr />
+<p><strong><font face="Arial, Helvetica, sans-serif">(Read-Only)</font></strong> 
+  <code><font size="4">Property Get <em>isBusy</em><a name="isBusy" id="isBusy"></a>() 
+  As Boolean</font></code></p>
+<p><font face="Arial, Helvetica, sans-serif">If this property returns True, the 
+  websocket is in the middle of sending or receiving data.</font><br />
+  <br />
+</p>
+<hr />
+<p><strong><font face="Arial, Helvetica, sans-serif">(Read-Write)</font></strong><font size="4"> 
+  <code>Property <strong>Let/Get</strong> <em>ChunkSize</em><a name="ChunkSize" id="ChunkSize"></a>() 
+  As Double</code></font><br />
+  <br />
+  <font face="Arial, Helvetica, sans-serif">Set or read this property to get/set 
+  the chunk size of data that the websocket sends to the server. the websocket 
+  protocol specifies 3 sizes for sending a data frame, (1)0-125 bytes, (2)126-65535 
+  bytes and (3)65536-2147483647(2.1 Gb) bytes.<br />
+  The websocket protocol also allows for splitting up data into smaller chunks 
+  and sending in multiple split packets called continue frames.The chunk size 
+  determines at what size the websocket will split up the data into multiple data 
+  frames to send. For example lets say you are sending 41kb of data in one send 
+  and chunksize is 4kb. The websocket will split up the send into 10 - 4kb sends 
+  and the last packet will be the remaining 1kb. If you frequently send large 
+  packets you can fine tune the data chunk size to be more effecient knowing that 
+  most winsock frames are 16kb in size (4kb on older systems)..<br />
+  This value should be an evenly divisible number (modulo) of 1024</font><br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+  <br />
+</p>
+<p>&nbsp; </p>
+</body>
+</html>

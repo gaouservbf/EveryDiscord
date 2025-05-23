@@ -59,7 +59,6 @@ Begin VB.Form Form2
          NumTabs         =   1
          BeginProperty Tab1 {0713F341-850A-101B-AFC0-4210102A8DA7} 
             Caption         =   "Credentials"
-            Key             =   ""
             Object.Tag             =   ""
             ImageVarType    =   2
          EndProperty
@@ -126,4 +125,5 @@ Form1.Show
     
     ' Set focus to token field
 End Sub
+
 

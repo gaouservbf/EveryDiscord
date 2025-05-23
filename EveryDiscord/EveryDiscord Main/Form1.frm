@@ -12,6 +12,12 @@ Begin VB.Form Form1
    ScaleHeight     =   8370
    ScaleWidth      =   10215
    StartUpPosition =   3  'Windows Default
+   Begin VB.Timer tmrHeartbeat 
+      Enabled         =   0   'False
+      Interval        =   1000
+      Left            =   4515
+      Top             =   3990
+   End
    Begin VB.PictureBox Picture3 
       BackColor       =   &H80000002&
       BorderStyle     =   0  'None
@@ -142,7 +148,6 @@ Begin VB.Form Form1
          BeginProperty Panel1 {0713E89F-850A-101B-AFC0-4210102A8DA7} 
             Text            =   "Connecting..."
             TextSave        =   "Connecting..."
-            Key             =   ""
             Object.Tag             =   ""
          EndProperty
       EndProperty
@@ -155,14 +160,6 @@ Begin VB.Form Form1
          Italic          =   0   'False
          Strikethrough   =   0   'False
       EndProperty
-   End
-   Begin MSWinsockLib.Winsock wsGateway 
-      Left            =   4920
-      Top             =   3840
-      _ExtentX        =   741
-      _ExtentY        =   741
-      _Version        =   393216
-      RemotePort      =   443
    End
    Begin VB.Timer Timer2 
       Interval        =   2500
@@ -366,6 +363,14 @@ Begin VB.Form Form1
       _ExtentY        =   741
       _Version        =   393216
    End
+   Begin EveryDiscord.Websocket wsGateway 
+      Height          =   465
+      Left            =   5355
+      Top             =   4410
+      Width           =   1590
+      _ExtentX        =   2805
+      _ExtentY        =   820
+   End
    Begin VB.Menu mnuMessages 
       Caption         =   "Messages"
       Visible         =   0   'False
@@ -388,7 +393,7 @@ Private Declare Function SendMessage Lib "user32" Alias "SendMessageW" (ByVal hW
 ' WebSocket Control needed for Gateway connection
 
 ' WebSocket constants for Gateway connection
-Private Const DISCORD_GATEWAY_URL As String = "gateway.discord.gg"
+Private Const DISCORD_GATEWAY_URL As String = "wss://gateway.discord.gg/?v=10&encoding=json"
 Private Const DISCORD_GATEWAY_VERSION As String = "10"
 Private Const DISCORD_GATEWAY_PORT As Long = 443
 
@@ -668,18 +673,6 @@ Private Sub tmrHeartbeat_Timer()
     
 End Sub
 
-' Add this to Form_Unload
-Private Sub Form_Unload(Cancel As Integer)
-    ' Clean up WebSocket and timers
-    If Not wsGateway Is Nothing Then
-        wsGateway.Close
-    End If
-    
-    If Not tmrHeartbeat Is Nothing Then
-        tmrHeartbeat.Enabled = False
-        Set tmrHeartbeat = Nothing
-    End If
-End Sub
 ' Called when socket connected and TLS handshake completed
 Private Sub OnConnect(ByVal socketIndex As Long)
     ' Send HTTP request
@@ -963,7 +956,7 @@ Private Sub ProcessChannelsResponse(aJson As String)
     parsed = Parse(sjson)
  
     If Not parsed.IsValid Then
-        MsgBox "Error parsing channel data: " & parsed.Error, vbExclamation
+        MsgBox "Error parsing channel data, JSON len: " & Len(aJson)
         Exit Sub
     End If
     
@@ -1086,8 +1079,8 @@ Private Sub ProcessMessagesResponse(aJson As String)
     ' Process each message
     For i = 20 To 1 Step -1
     On Error Resume Next
-        Dim msg As Object
-        Set msg = parsed.Value(i)
+        Dim Msg As Object
+        Set Msg = parsed.Value(i)
         
         ' Extract message details
         Dim sAuthor As String
@@ -1095,9 +1088,9 @@ Private Sub ProcessMessagesResponse(aJson As String)
         Dim sTimestamp As String
         
         On Error Resume Next ' Handle potential missing fields
-        sAuthor = msg("author")("username") & "#" & msg("author")("discriminator")
-        sContent = msg("content")
-        sTimestamp = FormatDiscordTimestamp(msg("timestamp"))
+        sAuthor = Msg("author")("username") & "#" & Msg("author")("discriminator")
+        sContent = Msg("content")
+        sTimestamp = FormatDiscordTimestamp(Msg("timestamp"))
         
         ' Format the output
         sOutput = "[" & sTimestamp & "] " & sAuthor & ": " & sContent
@@ -1172,25 +1165,210 @@ Private Sub Form_Load()
     
     ReDim m_GuildIds(0) As String
     ReDim m_ChannelIds(0) As String
-    MsgBox "Debug Start"
-    MsgBox GetSetting("DiscordClient", "Settings", "Token", "")
-    MsgBox GetSetting("DiscordClient", "Settings", "ChannelId", "")
     If GetSetting("DiscordClient", "Settings", "Token", "") <> "" Then
         txtToken.Text = GetSetting("DiscordClient", "Settings", "Token", "")
-        m_sToken = txtToken.Text
+        m_sToken = GetSetting("DiscordClient", "Settings", "Token", "")
     End If
     
     ' Auto load channel from settings if available
-    If GetSetting("DiscordClient", "Settings", "ChannelId", "") <> "" Then
         'txtCID.Text = GetSetting("DiscordClient", "Settings", "ChannelId", "")
        
         If Len(m_sToken) > 0 Then
+        ConnectToGateway
             'FetchChannelMessages txtCID.Text
             FetchUserGuilds
         End If
+End Sub
+Private Sub ConnectToGateway()
+    If Not wsGateway Is Nothing Then
+        If wsGateway.readyState <> STATE_CLOSED Then
+            wsGateway.Disconnect
+        End If
+    End If
+    
+    ' Set up headers (Discord requires Authorization header)
+    Dim Headers As New Collection
+    Headers.Add "Authorization: " & m_sToken
+    
+    ' Configure WebSocket
+    wsGateway.UseCompression = True ' Discord supports compression
+    wsGateway.ChunkSize = 4096
+    
+    ' Clear any existing messages
+    
+    ' Connect to Discord Gateway
+    MsgBox "Connecting to Discord Gateway..."
+    wsGateway.Connect DISCORD_GATEWAY_URL, "", "", "", Headers
+End Sub
+
+Private Sub DisconnectFromGateway()
+    If Not wsGateway Is Nothing Then
+        If wsGateway.readyState <> STATE_CLOSED Then
+            wsGateway.Disconnect
+        End If
+    End If
+End Sub
+Private Sub wsGateway_onClose(ByVal eCode As WebsocketStatus, ByVal reason As String)
+MsgBox "Disconnected from Gateway: " & reason
+    m_bGatewayConnected = False
+    m_bIdentified = False
+    
+    ' Attempt to reconnect after a delay
+    If m_sToken <> "" Then
+      MsgBox "Attempting to reconnect in 5 seconds..."
     End If
 End Sub
 
+Private Sub wsGateway_OnConnect(ByVal RemoteHost As String, ByVal RemoteIP As String, ByVal RemotePort As String)
+
+        Form1.tmrHeartbeat.Enabled = True
+        Form1.tmrHeartbeat.Interval = 1000
+  MsgBox "Connected to Discord Gateway"
+    m_bGatewayConnected = True
+End Sub
+
+Private Sub wsGateway_onError(ByVal eCode As WebsocketStatus, ByVal reason As String)
+   MsgBox "Gateway Error: " & CStr(eCode) & ": " & reason
+End Sub
+
+Private Sub wsGateway_OnMessage(ByVal Msg As Variant, ByVal opCode As WebsocketOpCode)
+    ' Discord Gateway messages are always JSON text
+    If opCode = opText Then
+        ProcessGatewayMessage CStr(Msg)
+    Else
+          MsgBox "Received unexpected binary data from Gateway"
+    End If
+End Sub
+
+Private Sub wsGateway_OnPong(ByVal IncludedMsg As String)
+    MsgBox "Received Pong from Gateway"
+End Sub
+Private Sub ProcessGatewayMessage(ByVal jsonMessage As String)
+On Error Resume Next
+    
+    Dim parsed As ParseResult
+    parsed = Parse(jsonMessage)
+    
+    If Not parsed.IsValid Then
+         MsgBox "Invalid JSON from Gateway: " & jsonMessage
+        Exit Sub
+    End If
+    
+    Dim opCode As Long
+    Dim eventData As Object
+    Dim seqNum As Long
+    
+    opCode = parsed.Value("op")
+    Set eventData = parsed.Value("d")
+    
+    seqNum = parsed.Value("s")
+    
+    If seqNum > 0 Then
+        m_lSequence = seqNum ' Store sequence number for reconnects
+    End If
+    
+    Select Case opCode
+        Case 0: ' Dispatch (event)
+            ProcessGatewayEvent parsed.Value("t"), eventData
+            
+        Case 1: ' Heartbeat
+            SendHeartbeat
+            
+        Case 7: ' Reconnect
+          StatusBar1.Panels(1).Text = "Gateway requesting reconnect..."
+            DisconnectFromGateway
+            ConnectToGateway
+            
+        Case 9: ' Invalid Session
+        StatusBar1.Panels(1).Text = "Gateway session invalidated"
+            m_bIdentified = False
+            If eventData Then ' Can resume?
+             StatusBar1.Panels(1).Text = "Attempting to resume session..."
+                SendResume
+                
+            Else
+             StatusBar1.Panels(1).Text = "Starting new session..."
+                SendIdentify
+            End If
+            
+        Case 10: ' Hello (contains heartbeat interval)
+            m_lHeartbeatInterval = eventData("heartbeat_interval")
+         StatusBar1.Panels(1).Text = "Gateway Hello received, heartbeat interval: " & m_lHeartbeatInterval
+            
+                tmrHeartbeat.Interval = m_lHeartbeatInterval
+                tmrHeartbeat.Enabled = True
+
+            
+            ' Send Identify if we haven't yet
+            If Not m_bIdentified Then
+                SendIdentify
+            End If
+            
+        Case 11: ' Heartbeat ACK
+            ' Nothing to do, we got our ACK
+         StatusBar1.Panels(1).Text = "Heartbeat acknowledged"
+            
+        Case Else
+           StatusBar1.Panels(1).Text = "Unhandled Gateway opcode: " & opCode
+    End Select
+    
+    Exit Sub
+EH:
+MsgBox "Error processing Gateway message: " & Err.Description
+End Sub
+
+Private Sub ProcessGatewayEvent(ByVal eventType As String, ByVal eventData As Object)
+    On Error Resume Next
+    
+    Select Case eventType
+        Case "MESSAGE_CREATE"
+            If eventData("channel_id") = m_sCurrentChannelId Then
+                Dim author As String
+                author = eventData("author")("username") & "#" & eventData("author")("discriminator")
+                Dim content As String
+                content = eventData("content")
+                
+                ChatView1.AddMessage author, content
+            End If
+            
+        Case "READY"
+        StatusBar1.Panels(1).Text = "Successfully identified with Gateway"
+            m_bIdentified = True
+            m_sSessionId = eventData("session_id")
+            
+        Case "GUILD_CREATE"
+     StatusBar1.Panels(1).Text = "Guild available: " & eventData("name")
+            
+        Case Else
+       StatusBar1.Panels(1).Text = "Unhandled event: " & eventType
+    End Select
+End Sub
+Private Sub SendIdentify()
+    Dim identifyPayload As String
+    identifyPayload = "{""op"":2,""d"":{""token"":""" & m_sToken & """,""properties"":{""$os"":""windows"",""$browser"":""my_vb6_client"",""$device"":""my_vb6_client""},""compress"":false,""large_threshold"":250}}"
+    
+    wsGateway.SendAdvanced identifyPayload, 1, True, False, True, False, False, False
+MsgBox "Sent Identify payload"
+End Sub
+
+Private Sub SendResume()
+    Dim resumePayload As String
+    resumePayload = "{""op"":6,""d"":{""token"":""" & m_sToken & """,""session_id"":""" & m_sSessionId & """,""seq"":" & m_lSequence & "}}"
+    
+    wsGateway.SendAdvanced resumePayload, 1, True, False, True, False, False, False
+MsgBox "Sent Resume payload"
+End Sub
+
+Private Sub SendHeartbeat()
+    If m_bGatewayConnected Then
+        Dim heartbeatPayload As String
+        heartbeatPayload = "{""op"":1,""d"":" & IIf(m_lSequence > 0, m_lSequence, "null") & "}"
+        
+        wsGateway.SendAdvanced heartbeatPayload, 1, True, False, True, False, False, False
+        m_dLastHeartbeat = Now
+      MsgBox "Sent Heartbeat"
+    End If
+End Sub
 Private Sub InitializeSocketArray()
     Dim i As Integer
     
@@ -1208,7 +1386,6 @@ Private Sub InitializeSocketArray()
     For i = 1 To MAX_CONNECTIONS - 1
          Load wscSocket(i)
         
-        ' Set initial state
         m_lSocketState(i) = SOCKET_IDLE
         m_sResponseBuffer(i) = ""
         m_lContentLength(i) = 0
@@ -1325,7 +1502,7 @@ Private Sub ProcessDMsResponse(aJson As String)
     Dim channel As Object
     Dim recipients As Object
     Dim recipientUser As Object
-    Dim k As Long
+    Dim K As Long
     Dim arrUsernames() As String
     ' Clean up the JSON input string - this was in the original, might be specific to the HTTP client/server
     ' It attempts to remove a potential 5-character suffix.
@@ -1457,14 +1634,14 @@ Private Sub ProcessDMsResponse(aJson As String)
                     If Err.Number = 0 And Not recipients Is Nothing Then
                         If recipients.Count > 0 Then
                             ReDim arrUsernames(1 To recipients.Count) ' Assuming 1-based collection
-                            For k = 1 To recipients.Count
-                                Set recipientUser = recipients(k) ' Assuming 1-based
+                            For K = 1 To recipients.Count
+                                Set recipientUser = recipients(K) ' Assuming 1-based
                                 If Not recipientUser Is Nothing Then
-                                    arrUsernames(k) = recipientUser("username")
+                                    arrUsernames(K) = recipientUser("username")
                                 Else
-                                    arrUsernames(k) = "Unknown"
+                                    arrUsernames(K) = "Unknown"
                                 End If
-                            Next k
+                            Next K
                             sDisplayName = Join(arrUsernames, ", ")
                         Else
                             sDisplayName = "Empty Group"
@@ -1637,7 +1814,7 @@ End Sub
 Private Sub ProcessIconResponse(ByVal socketIndex As Long, ByVal sResponse As String)
     On Error GoTo EH
 DoEvents
-    Dim headerEnd As Long
+    Dim HeaderEnd As Long
     Dim tempFile As String
     Dim isAnimated As Boolean
     Dim guildIndex As Long
@@ -1651,11 +1828,11 @@ DoEvents
     isAnimated = (Left$(iconHash, 2) = "a_")
 
     ' Find end of HTTP headers
-    headerEnd = InStr(sResponse, vbCrLf & vbCrLf)
+    HeaderEnd = InStr(sResponse, vbCrLf & vbCrLf)
 
-    If headerEnd > 0 Then
+    If HeaderEnd > 0 Then
         Dim binaryData As String
-        binaryData = Mid$(sResponse, headerEnd + 4)
+        binaryData = Mid$(sResponse, HeaderEnd + 4)
         
         ' Use .gif for animated, .jpg otherwise
         Dim fileExt As String
@@ -1720,43 +1897,6 @@ Private Sub cmdSendMsg_Click()
     ' Clear message textbox
     txtMsg.Text = ""
 End Sub
-
-
-Private Function EscapeJsonString(ByVal sText As String) As String
-    ' Basic JSON string escaping
-    Dim sEscaped As String
-    
-    sEscaped = Replace(sText, "\", "\\")
-    sEscaped = Replace(sEscaped, """", "\""")
-    sEscaped = Replace(sEscaped, vbCrLf, "\n")
-    sEscaped = Replace(sEscaped, vbTab, "\t")
-    
-    EscapeJsonString = sEscaped
-End Function
-
-
-
-
-Public Function preg_replace(find_re As String, sText As String, Optional sReplace As String) As String
-    preg_replace = pvInitRegExp(find_re).Replace(sText, sReplace)
-End Function
-
-Private Function pvInitRegExp(sPattern As String) As Object
-    Dim lIdx            As Long
-
-    Set pvInitRegExp = CreateObject("VBScript.RegExp")
-    With pvInitRegExp
-        .Global = True
-        If Left$(sPattern, 1) = "/" Then
-            lIdx = InStrRev(sPattern, "/")
-            .Pattern = Mid$(sPattern, 2, lIdx - 2)
-            .IgnoreCase = (InStr(lIdx, sPattern, "i") > 0)
-            .MultiLine = (InStr(lIdx, sPattern, "m") > 0)
-        Else
-            .Pattern = sPattern
-        End If
-    End With
-End Function
 
 
 
