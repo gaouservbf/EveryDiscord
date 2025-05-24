@@ -1,4 +1,4 @@
-Please open Project1.vbp to see the example
+Source for EveryDiscord.
 
 
 Disclaimer:
