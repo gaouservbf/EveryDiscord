@@ -12,9 +12,17 @@ Begin VB.Form Form1
    ScaleHeight     =   8370
    ScaleWidth      =   10215
    StartUpPosition =   3  'Windows Default
+   Begin VB.CommandButton Emojiz 
+      Height          =   435
+      Left            =   9765
+      Style           =   1  'Graphical
+      TabIndex        =   16
+      Top             =   7560
+      Width           =   435
+   End
    Begin VB.Timer tmrHeartbeat 
       Enabled         =   0   'False
-      Interval        =   1000
+      Interval        =   500
       Left            =   4515
       Top             =   3990
    End
@@ -68,7 +76,7 @@ Begin VB.Form Form1
          Width           =   2175
       End
    End
-   Begin VB.CommandButton Command1 
+   Begin VB.CommandButton btnUpload 
       Caption         =   "+"
       BeginProperty Font 
          Name            =   "Trebuchet MS"
@@ -173,12 +181,12 @@ Begin VB.Form Form1
    End
    Begin VB.PictureBox Picture1 
       BorderStyle     =   0  'None
-      Height          =   975
+      Height          =   1080
       Left            =   0
-      ScaleHeight     =   975
+      ScaleHeight     =   1080
       ScaleWidth      =   2775
       TabIndex        =   4
-      Top             =   7080
+      Top             =   6975
       Width           =   2775
       Begin VB.CommandButton Command2 
          Caption         =   "Config>>"
@@ -205,7 +213,7 @@ Begin VB.Form Form1
          ScaleHeight     =   555
          ScaleWidth      =   555
          TabIndex        =   10
-         Top             =   105
+         Top             =   210
          Width           =   555
       End
       Begin VB.Label Label2 
@@ -222,7 +230,7 @@ Begin VB.Form Form1
          Height          =   375
          Left            =   1365
          TabIndex        =   6
-         Top             =   315
+         Top             =   420
          Width           =   1455
       End
       Begin VB.Label Label1 
@@ -239,7 +247,7 @@ Begin VB.Form Form1
          Height          =   375
          Left            =   1200
          TabIndex        =   5
-         Top             =   120
+         Top             =   210
          Width           =   1575
       End
    End
@@ -309,7 +317,7 @@ Begin VB.Form Form1
       MultiLine       =   -1  'True
       TabIndex        =   0
       Top             =   7560
-      Width           =   7110
+      Width           =   6795
    End
    Begin MSWinsockLib.Winsock wscSocket 
       Index           =   0
@@ -326,8 +334,8 @@ Begin VB.Form Form1
       TabIndex        =   7
       Top             =   480
       Width           =   6735
-      _ExtentX        =   11880
-      _ExtentY        =   12383
+      _extentx        =   11880
+      _extenty        =   12383
    End
    Begin MSWinsockLib.Winsock wsGuildIcon 
       Index           =   1
@@ -353,8 +361,8 @@ Begin VB.Form Form1
       TabIndex        =   8
       Top             =   0
       Width           =   1335
-      _ExtentX        =   2355
-      _ExtentY        =   12303
+      _extentx        =   2355
+      _extenty        =   12303
    End
    Begin MSWinsockLib.Winsock wsMessage 
       Left            =   0
@@ -368,8 +376,8 @@ Begin VB.Form Form1
       Left            =   5355
       Top             =   4410
       Width           =   1590
-      _ExtentX        =   2805
-      _ExtentY        =   820
+      _extentx        =   2805
+      _extenty        =   820
    End
    Begin VB.Menu mnuMessages 
       Caption         =   "Messages"
@@ -502,9 +510,20 @@ Private Sub Command2_Click()
 Form3.Show
 End Sub
 
+
 Private Sub Form_Resize()
+On Error Resume Next
     ChatView1.Width = Me.ScaleWidth - GuildView1.Width - lstChannel.Width
+    GuildView1.Height = Me.ScaleHeight - Picture1.Height - StatusBar1.Height
+      lstChannel.Height = Me.ScaleHeight - Picture1.Height - StatusBar1.Height - lstChannel.Top
     Picture3.Width = Me.ScaleWidth - Picture3.Left
+    Picture1.Top = Me.ScaleHeight - Picture1.Height - StatusBar1.Height
+    Emojiz.Top = Me.ScaleHeight - 810
+    txtMsg.Top = Me.ScaleHeight - 810
+    btnUpload.Top = Me.ScaleHeight - 810
+    ChatView1.Height = Me.ScaleHeight - 1350
+    Emojiz.Left = Me.ScaleWidth - Emojiz.Width
+    txtMsg.Width = Me.ScaleWidth - txtMsg.Left - Emojiz.Width
 End Sub
 
 Private Sub GuildView1_GuildSelected(ByVal Index As Long)
@@ -1162,7 +1181,7 @@ Private Sub Form_Load()
     m_sBaseUrl = "discord.com"
     
     InitializeSocketArray
-    
+    Emojiz.Picture = LoadPicture(App.Path & "\emoji\msn\slight_smile.gif")
     ReDim m_GuildIds(0) As String
     ReDim m_ChannelIds(0) As String
     If GetSetting("DiscordClient", "Settings", "Token", "") <> "" Then
@@ -1191,13 +1210,13 @@ Private Sub ConnectToGateway()
     Headers.Add "Authorization: " & m_sToken
     
     ' Configure WebSocket
-    wsGateway.UseCompression = True ' Discord supports compression
+    'wsGateway.UseCompression = True ' Discord supports compression
     wsGateway.ChunkSize = 4096
     
     ' Clear any existing messages
     
     ' Connect to Discord Gateway
-    MsgBox "Connecting to Discord Gateway..."
+    StatusBar1.Panels(1).Text = "Connecting to Discord Gateway..."
     wsGateway.Connect DISCORD_GATEWAY_URL, "", "", "", Headers
 End Sub
 
@@ -1223,7 +1242,7 @@ Private Sub wsGateway_OnConnect(ByVal RemoteHost As String, ByVal RemoteIP As St
 
         Form1.tmrHeartbeat.Enabled = True
         Form1.tmrHeartbeat.Interval = 1000
-  MsgBox "Connected to Discord Gateway"
+   StatusBar1.Panels(1).Text = "Connected to Discord Gateway"
     m_bGatewayConnected = True
 End Sub
 
@@ -1236,12 +1255,12 @@ Private Sub wsGateway_OnMessage(ByVal Msg As Variant, ByVal opCode As WebsocketO
     If opCode = opText Then
         ProcessGatewayMessage CStr(Msg)
     Else
-          MsgBox "Received unexpected binary data from Gateway"
+           StatusBar1.Panels(1).Text = "Received unexpected binary data from Gateway"
     End If
 End Sub
 
 Private Sub wsGateway_OnPong(ByVal IncludedMsg As String)
-    MsgBox "Received Pong from Gateway"
+     StatusBar1.Panels(1).Text = "Received Pong from Gateway"
 End Sub
 Private Sub ProcessGatewayMessage(ByVal jsonMessage As String)
 On Error Resume Next
@@ -1291,13 +1310,18 @@ On Error Resume Next
                 SendIdentify
             End If
             
-        Case 10: ' Hello (contains heartbeat interval)
-            m_lHeartbeatInterval = eventData("heartbeat_interval")
-         StatusBar1.Panels(1).Text = "Gateway Hello received, heartbeat interval: " & m_lHeartbeatInterval
-            
-                tmrHeartbeat.Interval = m_lHeartbeatInterval
-                tmrHeartbeat.Enabled = True
-
+           Case 10: ' Hello (contains heartbeat interval)
+        m_lHeartbeatInterval = eventData("heartbeat_interval")
+        StatusBar1.Panels(1).Text = "Gateway Hello received, heartbeat interval: " & m_lHeartbeatInterval
+        
+        ' Set timer to 75-90% of the interval Discord provides
+        tmrHeartbeat.Interval = m_lHeartbeatInterval * 0.75
+        
+        ' Start the timer
+        tmrHeartbeat.Enabled = True
+        
+        ' Send first heartbeat immediately
+        SendHeartbeat
             
             ' Send Identify if we haven't yet
             If Not m_bIdentified Then
@@ -1325,10 +1349,10 @@ Private Sub ProcessGatewayEvent(ByVal eventType As String, ByVal eventData As Ob
             If eventData("channel_id") = m_sCurrentChannelId Then
                 Dim author As String
                 author = eventData("author")("username") & "#" & eventData("author")("discriminator")
-                Dim content As String
-                content = eventData("content")
+                Dim Content As String
+                Content = eventData("content")
                 
-                ChatView1.AddMessage author, content
+                ChatView1.AddMessage author, Content
             End If
             
         Case "READY"
@@ -1348,7 +1372,7 @@ Private Sub SendIdentify()
     identifyPayload = "{""op"":2,""d"":{""token"":""" & m_sToken & """,""properties"":{""$os"":""windows"",""$browser"":""my_vb6_client"",""$device"":""my_vb6_client""},""compress"":false,""large_threshold"":250}}"
     
     wsGateway.SendAdvanced identifyPayload, 1, True, False, True, False, False, False
-MsgBox "Sent Identify payload"
+ StatusBar1.Panels(1).Text = "Sent Identify payload"
 End Sub
 
 Private Sub SendResume()
@@ -1356,7 +1380,7 @@ Private Sub SendResume()
     resumePayload = "{""op"":6,""d"":{""token"":""" & m_sToken & """,""session_id"":""" & m_sSessionId & """,""seq"":" & m_lSequence & "}}"
     
     wsGateway.SendAdvanced resumePayload, 1, True, False, True, False, False, False
-MsgBox "Sent Resume payload"
+ StatusBar1.Panels(1).Text = "Sent Resume payload"
 End Sub
 
 Private Sub SendHeartbeat()
@@ -1366,7 +1390,7 @@ Private Sub SendHeartbeat()
         
         wsGateway.SendAdvanced heartbeatPayload, 1, True, False, True, False, False, False
         m_dLastHeartbeat = Now
-      MsgBox "Sent Heartbeat"
+       StatusBar1.Panels(1).Text = "Sent Heartbeat"
     End If
 End Sub
 Private Sub InitializeSocketArray()
