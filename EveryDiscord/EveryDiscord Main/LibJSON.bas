@@ -17,6 +17,12 @@ Attribute VB_Name = "LibJSON"
 ''     * Comments not supported, trailing or inline
 ''       They are simply treated as normal text if inside a json string
 ''     * Supports 'extensions' via the available arguments - see repository docs
+''  - Serializer:
+''     * Non-Recursive - avoids 'Out of stack space' for deep nesting
+''     * Detects cirular object references
+''     * Can sort keys
+''     * Supports multi-dimensional arrays
+''     * Supports 'options' via the available arguments - see repository docs
 ''==============================================================================
 
 '===============================================================================
@@ -58,13 +64,13 @@ Option Private Module
 
 #If Mac Then
     #If VBA7 Then 'https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man3/iconv.3.html
-        Private Declare PtrSafe Function CopyMemory Lib "/usr/lib/libc.dylib" Alias "memmove" (Destination As Any, Source As Any, ByVal Length As LongPtr) As LongPtr
+        Private Declare PtrSafe Function memmove Lib "/usr/lib/libc.dylib" (Destination As Any, Source As Any, ByVal Length As LongPtr) As LongPtr
         Private Declare PtrSafe Function iconv Lib "/usr/lib/libiconv.dylib" (ByVal cd As LongPtr, ByRef inBuf As LongPtr, ByRef inBytesLeft As LongPtr, ByRef outBuf As LongPtr, ByRef outBytesLeft As LongPtr) As LongPtr
         Private Declare PtrSafe Function iconv_open Lib "/usr/lib/libiconv.dylib" (ByVal toCode As LongPtr, ByVal fromCode As LongPtr) As LongPtr
         Private Declare PtrSafe Function iconv_close Lib "/usr/lib/libiconv.dylib" (ByVal cd As LongPtr) As Long
         Private Declare PtrSafe Function errno_location Lib "/usr/lib/libSystem.B.dylib" Alias "__error" () As LongPtr
     #Else
-        Private Declare Function CopyMemory Lib "/usr/lib/libc.dylib" Alias "memmove" (Destination As Any, Source As Any, ByVal Length As Long) As Long
+        Private Declare Function memmove Lib "/usr/lib/libc.dylib" (Destination As Any, Source As Any, ByVal Length As Long) As Long
         Private Declare Function iconv Lib "/usr/lib/libiconv.dylib" (ByVal cd As Long, ByRef inBuf As Long, ByRef inBytesLeft As Long, ByRef outBuf As Long, ByRef outBytesLeft As Long) As Long
         Private Declare Function iconv_open Lib "/usr/lib/libiconv.dylib" (ByVal toCode As Long, ByVal fromCode As Long) As Long
         Private Declare Function iconv_close Lib "/usr/lib/libiconv.dylib" (ByVal cd As Long) As Long
@@ -72,11 +78,11 @@ Option Private Module
     #End If
 #Else 'Windows
     #If VBA7 Then
-        Private Declare PtrSafe Sub CopyMemory Lib "kernel32" Alias "RtlMoveMemory" (Destination As Any, Source As Any, ByVal Length As LongPtr)
+        Private Declare PtrSafe Sub VariantCopy Lib "oleaut32.dll" (ByRef pvargDest As Variant, ByVal pvargSrc As LongPtr)
         Private Declare PtrSafe Function MultiByteToWideChar Lib "kernel32" (ByVal codePage As Long, ByVal dwFlags As Long, ByVal lpMultiByteStr As LongPtr, ByVal cbMultiByte As Long, ByVal lpWideCharStr As LongPtr, ByVal cchWideChar As Long) As Long
         Private Declare PtrSafe Function WideCharToMultiByte Lib "kernel32" (ByVal codePage As Long, ByVal dwFlags As Long, ByVal lpWideCharStr As LongPtr, ByVal cchWideChar As Long, ByVal lpMultiByteStr As LongPtr, ByVal cbMultiByte As Long, ByVal lpDefaultChar As LongPtr, ByVal lpUsedDefaultChar As LongPtr) As Long
     #Else
-        Private Declare Sub CopyMemory Lib "kernel32" Alias "RtlMoveMemory" (Destination As Any, Source As Any, ByVal Length As Long)
+        Private Declare Sub VariantCopy Lib "oleaut32.dll" (ByRef pvargDest As Variant, ByVal pvargSrc As Long)
         Private Declare Function MultiByteToWideChar Lib "kernel32" (ByVal codePage As Long, ByVal dwFlags As Long, ByVal lpMultiByteStr As Long, ByVal cchMultiByte As Long, ByVal lpWideCharStr As Long, ByVal cchWideChar As Long) As Long
         Private Declare Function WideCharToMultiByte Lib "kernel32" (ByVal codePage As Long, ByVal dwFlags As Long, ByVal lpWideCharStr As Long, ByVal cchWideChar As Long, ByVal lpMultiByteStr As Long, ByVal cchMultiByte As Long, ByVal lpDefaultChar As Long, ByVal lpUsedDefaultChar As Long) As Long
     #End If
@@ -84,6 +90,9 @@ Option Private Module
 
 #Const Windows = (Mac = 0)
 #Const x64 = Win64
+#If (x64 = 0) Or Mac Then
+    Const vbLongLong = 20
+#End If
 
 #If VBA7 = 0 Then
     Private Enum LongPtr
@@ -101,6 +110,11 @@ Private Enum DataTypeSize
     ptrSize = 4
 #End If
     currSize = 8
+#If x64 Then
+    variantSize = 24
+#Else
+    variantSize = 16
+#End If
 End Enum
 
 #If x64 Then
@@ -149,6 +163,23 @@ Private Type CurrencyAccessor
     arr() As Currency
     sa As SAFEARRAY_1D
 End Type
+Private Type VariantAccessor
+    arr() As Variant
+    vt() As Integer
+    sa As SAFEARRAY_1D
+End Type
+Private Type SABoundAccessor
+    rgsabound() As SAFEARRAYBOUND
+    sa As SAFEARRAY_1D
+End Type
+
+Private Type FakeVariant
+    vt As Integer
+    wReserved1 As Integer
+    wReserved2 As Integer
+    wReserved3 As Integer
+    ptrs(0 To 1) As LongPtr
+End Type
 
 Private Type FourByteTemplate
     b(0 To 3) As Byte
@@ -175,11 +206,13 @@ Private Enum CharCode
     ccZero = 48         '0x30 0
     ccNine = 57         '0x39 9
     ccColon = 58        '0x3A :
+    ccCapitalE = 69     '0x45 E
     ccArrayStart = 91   '0x5B [
     ccBackslash = 92    '0x5C \
     ccArrayEnd = 93     '0x5D ]
     ccBacktick = 96     '0x60 `
     ccLowB = 98         '0x62 b
+    ccLowE = 101        '0x65 e
     ccLowF = 102        '0x66 f
     ccLowN = 110        '0x6E n
     ccLowR = 114        '0x72 r
@@ -187,6 +220,7 @@ Private Enum CharCode
     ccLowU = 117        '0x75 u
     ccObjectStart = 123 '0x7B {
     ccObjectEnd = 125   '0x7D }
+    ccDel = 127         '0x7F DEL - last ASCII
 End Enum
 
 Private Enum CharType
@@ -217,13 +251,27 @@ Private Enum AllowedToken
     allowValue = 32
 End Enum
 
-Private Type ContextInfo
+Private Type ParseContextInfo
     coll As Collection
     dict As Dictionary
     tAllow As AllowedToken
     isDict As Boolean
     pendingKey As String
     pendingKeyPos As Long
+End Type
+
+Private Type SerializeContextInfo
+    arrKeys() As Variant
+    arrItems() As Variant
+    isDict As Boolean
+    isSerializable  As Boolean
+    incIndex As Long
+    currIndex As Long
+    ub As Long
+    iUnkPtr As LongPtr
+    firstItemPtr As LongPtr
+    firstKeyPtr As LongPtr
+    epClose As EncodedPosition
 End Type
 
 Private Type JSONOptions
@@ -251,6 +299,38 @@ Private Type BOM
     sizeB As Long
 End Type
 
+Private Type TextBuffer
+    Text As String
+    Index As Long
+    Limit As Long
+End Type
+
+Private Enum EncodedPosition
+    epTrue = -1
+    [_epMin] = epTrue
+    epFalse = 0
+    epNull
+    epText
+    epArray
+    epDict
+    epLBrace
+    epRBrace
+    epLBracket
+    epRBracket
+    epComma
+    [_epMax] = epComma
+End Enum
+
+Private Type InfOrNaNInfo
+    Offset As LongPtr
+    Mask As Integer
+End Type
+
+Private Type EncodedString
+    s As String
+    sLen As Long
+End Type
+
 Public Type ParseResult
     Value As Variant
     IsValid As Boolean
@@ -263,7 +343,7 @@ End Type
 ' - Does not throw
 ' - Returns a convenient custom Type and it's .Value can be an object or not
 ' - Supports UTF8, UTF16 (LE and BE) and UTF32 (LE and BE on Mac only)
-' - Returs UTF16LE texts only
+' - Returns UTF16LE texts only
 ' - Accepts Default Class Members so no need to check for IsObject
 ' - Numbers are rounded to the nearest Double and if possible Decimal is used
 'Parameters:
@@ -494,100 +574,109 @@ Private Function Decode(ByVal jsonPtr As LongPtr _
                       , ByRef outBuffPtr As LongPtr _
                       , ByRef outErrDesc As String _
                       , ByVal failIfInvalidByteSequence As Boolean) As Boolean
-    #If Mac Then
-        outBuff = Space$(sizeB * 2)
-        outBuffSize = sizeB * 4
-        outBuffPtr = StrPtr(outBuff)
-        '
-        Dim inBytesLeft As LongPtr:  inBytesLeft = sizeB
-        Dim outBytesLeft As LongPtr: outBytesLeft = outBuffSize
-        Static collDescriptors As New Collection
-        Dim cd As LongPtr
-        Dim defaultChar As String: defaultChar = ChrW$(&HFFFD)
-        Dim defPtr As LongPtr:     defPtr = StrPtr(defaultChar)
-        Dim nonRev As LongPtr
-        Dim inPrevLeft As LongPtr
-        Dim outPrevLeft As LongPtr
-        '
-        On Error Resume Next
-        cd = collDescriptors(CStr(jpCode))
-        On Error GoTo 0
-        '
-        If cd = NullPtr Then
-            Static descTo As String
-            Dim descFrom As String: descFrom = PageCodeDesc(jpCode)
-            If LenB(descTo) = 0 Then descTo = PageCodeDesc(jpCodeUTF16LE)
-            cd = iconv_open(StrPtr(descTo), StrPtr(descFrom))
-            If cd = -1 Then
-                outErrDesc = "Unsupported page code conversion"
-                Exit Function
-            End If
-            collDescriptors.Add cd, CStr(jpCode)
-        End If
-        Do
-            CopyMemory ByVal errno_location, 0&, longSize
-            inPrevLeft = inBytesLeft
-            outPrevLeft = outBytesLeft
-            nonRev = iconv(cd, jsonPtr, inBytesLeft, outBuffPtr, outBytesLeft)
-            If nonRev >= 0 Then Exit Do
-            Const EILSEQ As Long = 92
-            Const EINVAL As Long = 22
-            Dim errNo As Long: CopyMemory errNo, ByVal errno_location, longSize
-            '
-            If (errNo = EILSEQ Eqv errNo = EINVAL) Or failIfInvalidByteSequence _
-            Then
-                Select Case errNo
-                    Case EILSEQ: outErrDesc = "Invalid byte sequence: "
-                    Case EINVAL: outErrDesc = "Incomplete byte sequence: "
-                    Case Else:   outErrDesc = "Failed conversion: "
-                End Select
-                outErrDesc = outErrDesc & " from CP" & jpCode
-                Exit Function
-            End If
-            CopyMemory ByVal outBuffPtr, ByVal defPtr, intSize
-            outBytesLeft = outBytesLeft - intSize
-            outBuffPtr = outBuffPtr + intSize
-            jsonPtr = jsonPtr + byteSize
-            inBytesLeft = inBytesLeft - byteSize
-        Loop
-        outBuffSize = (outBuffSize - CLng(outBytesLeft)) \ 2
-        outBuffPtr = StrPtr(outBuff)
-        Decode = True
-    #Else
-        Const MB_ERR_INVALID_CHARS As Long = 8
-        Dim charCount As Long
-        Dim dwFlags As Long
-        '
-        If failIfInvalidByteSequence Then
-            Select Case jpCode
-            Case jpCodeUTF8, jpCodeUTF32LE, jpCodeUTF32BE
-                dwFlags = MB_ERR_INVALID_CHARS
-            End Select
-        End If
-        charCount = MultiByteToWideChar(jpCode, dwFlags, jsonPtr, sizeB, 0, 0)
-        If charCount = 0 Then
-            Const ERROR_INVALID_PARAMETER      As Long = 87
-            Const ERROR_NO_UNICODE_TRANSLATION As Long = 1113
-            '
-            Select Case Err.LastDllError
-            Case ERROR_NO_UNICODE_TRANSLATION
-                outErrDesc = "Invalid CP" & jpCode & " byte sequence"
-            Case ERROR_INVALID_PARAMETER
-                outErrDesc = "Code Page: " & jpCode & " not supported"
-            Case Else
-                outErrDesc = "Unicode conversion failed"
-            End Select
+#If Mac Then
+    outBuff = Space$(sizeB * 2)
+    outBuffSize = sizeB * 4
+    outBuffPtr = StrPtr(outBuff)
+    '
+    Dim inBytesLeft As LongPtr:  inBytesLeft = sizeB
+    Dim outBytesLeft As LongPtr: outBytesLeft = outBuffSize
+    Static collDescriptors As New Collection
+    Dim cd As LongPtr
+    Dim defaultChar As String: defaultChar = ChrW$(&HFFFD)
+    Dim defPtr As LongPtr:     defPtr = StrPtr(defaultChar)
+    Dim nonRev As LongPtr
+    Dim inPrevLeft As LongPtr
+    Dim outPrevLeft As LongPtr
+    Dim charSize As Long
+    '
+    Select Case jpCode
+    Case jpCodeUTF8:                   charSize = byteSize
+    Case jpCodeUTF32LE, jpCodeUTF32BE: charSize = longSize
+    Case Else
+        outErrDesc = "Code Page: " & jpCode & " not supported"
+        Exit Function
+    End Select
+    '
+    On Error Resume Next
+    cd = collDescriptors(CStr(jpCode))
+    On Error GoTo 0
+    '
+    If cd = NullPtr Then
+        Static descTo As String
+        Dim descFrom As String: descFrom = PageCodeDesc(jpCode)
+        If LenB(descTo) = 0 Then descTo = PageCodeDesc(jpCodeUTF16LE)
+        cd = iconv_open(StrPtr(descTo), StrPtr(descFrom))
+        If cd = -1 Then
+            outErrDesc = "Unsupported page code conversion"
             Exit Function
         End If
-        outBuff = Space$(charCount)
-        outBuffPtr = StrPtr(outBuff)
-        outBuffSize = charCount
+        collDescriptors.Add cd, CStr(jpCode)
+    End If
+    Do
+        memmove ByVal errno_location, 0&, longSize
+        inPrevLeft = inBytesLeft
+        outPrevLeft = outBytesLeft
+        nonRev = iconv(cd, jsonPtr, inBytesLeft, outBuffPtr, outBytesLeft)
+        If nonRev >= 0 Then Exit Do
+        Const EILSEQ As Long = 92
+        Const EINVAL As Long = 22
+        Dim errNo As Long: memmove errNo, ByVal errno_location, longSize
         '
-        MultiByteToWideChar jpCode, dwFlags, jsonPtr _
-                          , sizeB, outBuffPtr, charCount
-        Decode = (charCount = outBuffSize)
-        If Not Decode Then outErrDesc = "Unicode conversion failed"
-    #End If
+        If (errNo = EILSEQ Eqv errNo = EINVAL) Or failIfInvalidByteSequence _
+        Then
+            Select Case errNo
+                Case EILSEQ: outErrDesc = "Invalid byte sequence: "
+                Case EINVAL: outErrDesc = "Incomplete byte sequence: "
+                Case Else:   outErrDesc = "Failed conversion: "
+            End Select
+            outErrDesc = outErrDesc & " from CP" & jpCode
+            Exit Function
+        End If
+        memmove ByVal outBuffPtr, ByVal defPtr, intSize
+        outBytesLeft = outBytesLeft - intSize
+        outBuffPtr = outBuffPtr + intSize
+        jsonPtr = jsonPtr + charSize
+        inBytesLeft = inBytesLeft - charSize
+    Loop
+    outBuffSize = (outBuffSize - CLng(outBytesLeft)) \ 2
+    outBuffPtr = StrPtr(outBuff)
+    Decode = True
+#Else
+    Const MB_ERR_INVALID_CHARS As Long = 8
+    Dim charCount As Long
+    Dim dwFlags As Long
+    '
+    If failIfInvalidByteSequence Then
+        Select Case jpCode
+        Case jpCodeUTF8, jpCodeUTF32LE, jpCodeUTF32BE
+            dwFlags = MB_ERR_INVALID_CHARS
+        End Select
+    End If
+    charCount = MultiByteToWideChar(jpCode, dwFlags, jsonPtr, sizeB, 0, 0)
+    If charCount = 0 Then
+        Const ERROR_INVALID_PARAMETER      As Long = 87
+        Const ERROR_NO_UNICODE_TRANSLATION As Long = 1113
+        '
+        Select Case Err.LastDllError
+        Case ERROR_NO_UNICODE_TRANSLATION
+            outErrDesc = "Invalid CP" & jpCode & " byte sequence"
+        Case ERROR_INVALID_PARAMETER
+            outErrDesc = "Code Page: " & jpCode & " not supported"
+        Case Else
+            outErrDesc = "Unicode conversion failed"
+        End Select
+        Exit Function
+    End If
+    outBuff = Space$(charCount)
+    outBuffPtr = StrPtr(outBuff)
+    outBuffSize = charCount
+    '
+    charCount = MultiByteToWideChar(jpCode, dwFlags, jsonPtr _
+                                  , sizeB, outBuffPtr, charCount)
+    Decode = (charCount = outBuffSize)
+    If Not Decode Then outErrDesc = "Unicode conversion failed"
+#End If
 End Function
 #If Mac Then
 Private Function PageCodeDesc(ByVal jpCode As JsonPageCode) As String
@@ -606,8 +695,8 @@ End Function
 Private Sub ReverseBytes(ByVal jsonPtr As LongPtr _
                        , ByVal sizeB As Long _
                        , ByRef outBuff As String _
-                       , ByRef outBuffSize As Long _
-                       , ByRef outBuffPtr As LongPtr)
+                       , Optional ByRef outBuffSize As Long _
+                       , Optional ByRef outBuffPtr As LongPtr)
     Static bytesSrc As ByteAccessor
     Static bytesDest As ByteAccessor
     Dim i As Long
@@ -644,6 +733,9 @@ Private Sub InitAccessor(ByVal accPtr As LongPtr _
                        , ByVal elemSize As DataTypeSize)
     InitSafeArray sa, elemSize
     MemLongPtr(accPtr) = VarPtr(sa)
+    If elemSize = variantSize Then 'Init auxiliary VarType
+        MemLongPtr(accPtr + ptrSize) = VarPtr(sa)
+    End If
 End Sub
 
 Private Sub InitSafeArray(ByRef sa As SAFEARRAY_1D, ByVal elemSize As Long)
@@ -660,15 +752,15 @@ End Sub
 
 Private Property Let MemLongPtr(ByVal memAddress As LongPtr _
                               , ByVal newValue As LongPtr)
-    #If Mac Or (VBA7 = 0) Then
-        CopyMemory ByVal memAddress, newValue, ptrSize
+    #If Mac Then
+        memmove ByVal memAddress, newValue, ptrSize
     #ElseIf TWINBASIC Then
         PutMemPtr memAddress, newValue
     #Else
         Static pa As PointerAccessor
         If pa.sa.cDims = 0 Then
             InitSafeArray pa.sa, ptrSize
-            CopyMemory pa, VarPtr(pa.sa), ptrSize 'Only API call
+            MemLongPtrRef(VarPtr(pa)) = VarPtr(pa.sa)
         End If
         '
         pa.sa.pvData = memAddress
@@ -679,8 +771,8 @@ Private Property Let MemLongPtr(ByVal memAddress As LongPtr _
     #End If
 End Property
 Private Property Get MemLongPtr(ByVal memAddress As LongPtr) As LongPtr
-    #If Mac Or (VBA7 = 0) Then
-        CopyMemory MemLongPtr, ByVal memAddress, ptrSize
+    #If Mac Then
+        memmove MemLongPtr, ByVal memAddress, ptrSize
     #ElseIf TWINBASIC Then
         GetMemPtr memAddress, MemLongPtr
     #Else
@@ -698,6 +790,39 @@ Private Property Get MemLongPtr(ByVal memAddress As LongPtr) As LongPtr
         pa.sa.pvData = NullPtr
     #End If
 End Property
+
+#If Windows Then
+Private Property Let MemLongPtrRef(ByVal memAddress As LongPtr _
+                                 , ByVal newValue As LongPtr)
+    Const VT_BYREF As Long = &H4000
+    Dim memValue As Variant
+    Dim remoteVT As Variant
+    Dim fv As FakeVariant
+    '
+    fv.ptrs(0) = VarPtr(memValue)
+    fv.vt = vbInteger + VT_BYREF
+    VariantCopy remoteVT, VarPtr(fv) 'Init VarType ByRef
+    '
+#If Win64 Then 'Cannot assign LongLong ByRef
+    Dim c As Currency
+    RemoteAssign memValue, VarPtr(newValue), remoteVT, vbCurrency + VT_BYREF, c, memValue
+    RemoteAssign memValue, memAddress, remoteVT, vbCurrency + VT_BYREF, memValue, c
+#Else 'Can assign Long ByRef
+    RemoteAssign memValue, memAddress, remoteVT, vbLong + VT_BYREF, memValue, newValue
+#End If
+End Property
+Private Sub RemoteAssign(ByRef memValue As Variant _
+                       , ByRef memAddress As LongPtr _
+                       , ByRef remoteVT As Variant _
+                       , ByVal newVT As VbVarType _
+                       , ByRef targetVariable As Variant _
+                       , ByRef newValue As Variant)
+    memValue = memAddress
+    remoteVT = newVT
+    targetVariable = newValue
+    remoteVT = vbEmpty
+End Sub
+#End If
 
 'Non-recursive parser
 Private Function ParseChars(ByRef inChars() As Integer _
@@ -731,14 +856,16 @@ Private Function ParseChars(ByRef inChars() As Integer _
     '
     On Error GoTo ErrorHandler
     '
-    Dim cInfo As ContextInfo
+    Dim cInfo As ParseContextInfo
     Dim depth As Long
     Dim ch As Integer
     Dim wasValue As Boolean
-    Dim parents() As ContextInfo: ReDim parents(0 To 0)
+    Dim parents() As ParseContextInfo
+    Dim ubParents As Long
     Dim buffSize As Long: buffSize = 16
     Dim sBuff As String:  sBuff = Space$(buffSize)
     Dim ub As Long:       ub = UBound(inChars)
+    Dim chDot As Integer: chDot = AscW(Mid$(CStr(1.1), 2, 1)) 'Locale Dot
     '
     i = 0
     cInfo.tAllow = allowValue
@@ -755,7 +882,10 @@ Private Function ParseChars(ByRef inChars() As Integer _
             If (cInfo.tAllow And allowValue) = 0 Then GoTo Unexpected
             depth = depth + 1
             If depth > inOptions.maxDepth Then Err.Raise 5, , "Max Depth Hit"
-            If depth > UBound(parents) Then ReDim Preserve parents(0 To depth)
+            If depth > ubParents Then
+                ReDim Preserve parents(0 To depth)
+                ubParents = depth
+            End If
             parents(depth) = cInfo
             '
             cInfo = parents(0) 'Clears members
@@ -899,6 +1029,7 @@ Private Function ParseChars(ByRef inChars() As Integer _
                                           Or hasExp Then GoTo Unexpected
                     hasDot = True
                     hasLeadZero = False
+                    ch = chDot 'We avoid Val() because we also want CDec()
                 ElseIf ct = numExp Then
                     If prevCT <> numDigit Or hasExp Then GoTo Unexpected
                     hasExp = True
@@ -1054,8 +1185,8 @@ Private Sub InitCharMap(ByRef cm As CharacterMap)
     cm.toType(ccPlus) = numSign
     cm.toType(ccMinus) = numSign
     cm.toType(ccDot) = numDot
-    cm.toType(69) = numExp  'e
-    cm.toType(101) = numExp 'E
+    cm.toType(ccCapitalE) = numExp
+    cm.toType(ccLowE) = numExp
     '
     'Map nibbles in escaped 4-hex Unicode chracters e.g. \u2713 (check mark)
     'Avoids the use of ChrW by precomputing all hex digits and their position
@@ -1093,4 +1224,985 @@ Private Function IsFastDict() As Boolean
     Dim d As Dictionary: Set d = o.Self.Factory
     IsFastDict = (Err.Number = 0)
     On Error GoTo 0
+End Function
+
+'*******************************************************************************
+'Serializes the input data to a json string
+' - Does not throw
+' - By default, this method cannot fail.
+'   It can only fail in the following scenarios:
+'     1) A non-text key is found and 'failIfNonTextKeys' is set to 'True'
+'     2) A circular reference is found and 'failIfCircularRef' is set to 'True'
+'     3) Encoding failed from UTF16LE to unsupported code page
+'     4) Encoding failed from UTF16LE to supported code page because invalid
+'        character was found while 'failIfInvalidCharacter' is set to 'True'
+'   Read more on these parameters below.
+'   On failure, it returns a null String and an 'outError' ByRef (String)
+' - By default, returns UTF16LE json string - see 'jpCode' below
+' - Invalid data types (direct or nested) are replaced with Null:
+'     - Empty
+'     - User Defined Type
+'     - Nothing or an interface not implementing 'ToSerializable'
+'     - Uninitialized Array
+'     - Special Single/Double values: +Inf, -Inf, SNaN, QNaN
+'     - Circular references (by default - see below)
+'Parameters:
+' * jsonData - can be any of the following:
+'     - primitive (String, Number, Boolean, Null)
+'     - Array or Collection
+'     - Dictionary
+'     - Any class that implements a 'ToSerializable() As Variant' method
+' * indentSpaces:
+'     - Default is 0 - no indentation
+'     - For positive values, indenting will be added up to 'maxIndent' (16)
+' * escapeNonASCII (character codes less than 0 and higher than 127):
+'     - False:          codes outside 0-127 are not escaped
+'     - True (Default): codes outsde 0-126 are escaped using the \u0000 notation
+'                       Note DEL (127) is escaped even though is ASCII
+' * sortKeys:
+'     - False (Default): does nothing
+'     - True:            sorts dictionary keys, ascending.
+'                        Useful for debugging or comparing JSON data
+' * forceKeysToText:
+'     - False (Default): non-text keys are skipped
+'     - True:            converts vbError, vbDate and number data types to text
+' * failIfNonTextKeys:
+'     - False (Default): does nothing - non-text keys are skipped,
+'                        unless 'failIfNonTextKeys' is 'True' and converted
+'     - True:            fails if a non-text key is found.
+'                        Note that if 'forceKeysToText' is 'True' then only
+'                        fails if there are keys that cannot be converted
+' * failIfCircularRef:
+'     - False (Default): inserts Null if circular reference is found
+'     - True:            fails if circular reference is found
+'     An object can reference itself, either directly or indirectly
+' * formatDateISO
+'     - False (Default): yyyy-mm-dd hh:nn:ss
+'     - True:            yyyy-mm-ddThh:nn:ss.sssZ (see FormatISOExt method)
+' * jpCode:
+'     - Default is UTF16LE. Supports UTF8, UTF16BE and UTF32 (Mac only)
+' * failIfInvalidCharacter:
+'     Only applicable if conversion is needed from UTF16LE to UTF8
+'     - False (Default): replaces each illegal character with U+FFFD
+'     - True:            fails if invalid character detected
+' * outError:
+'     Returns error message (ByRef) on failure
+'*******************************************************************************
+Public Function Serialize(ByRef jsonData As Variant _
+                        , Optional ByVal indentSpaces As Long = 0 _
+                        , Optional ByVal escapeNonASCII As Boolean = True _
+                        , Optional ByVal sortKeys As Boolean = False _
+                        , Optional ByVal forceKeysToText As Boolean = False _
+                        , Optional ByVal failIfNonTextKeys As Boolean = False _
+                        , Optional ByVal failIfCircularRef As Boolean = False _
+                        , Optional ByVal formatDateISO As Boolean = False _
+                        , Optional ByVal jpCode As JsonPageCode = jpCodeUTF16LE _
+                        , Optional ByVal failIfInvalidCharacter As Boolean = False _
+                        , Optional ByRef outError As String) As String
+    Const dateF As String = "yyyy-mm-dd hh:nn:ss"
+    Const dateFStr As String = "\""yyyy-mm-dd hh:nn:ss\"""
+    Const maxBit As Long = &H40000000
+    Const maxBuf As Long = &H7FFFFFFF
+    Const errMissing As Long = &H80020004
+    Const initLevels As Long = 16
+    Const maxIndent As Long = 16
+    Const pOffset As Long = 8
+    Static encoded([_epMin] To [_epMax]) As EncodedString
+    Static escaped(ccNull To ccSpace - 1) As EncodedString
+    Static map(0 To 255) As String
+    Static ints As IntegerAccessor
+    Static chars As IntegerAccessor
+    Static ptrs As PointerAccessor
+    Static vars As VariantAccessor
+    Static bounds As SABoundAccessor
+    Static infOrNaN(vbSingle To vbDouble) As InfOrNaNInfo
+    Static numChar(ccSpace To ccBacktick) As Byte
+    Static vtblScriptPtr As LongPtr
+    Dim fv As FakeVariant
+    Dim colonLen As Long
+    Dim commaLen As Long
+    Dim nLineLen As Long
+    Dim ep As EncodedPosition
+    Dim beautify As Boolean
+    Dim depth As Long
+    Dim ub As Long
+    Dim levels() As SerializeContextInfo
+    Dim currentIndent As Long
+    Dim tempIndent As Long
+    Dim spaces As String
+    Dim spCount As Long
+    Dim buff As TextBuffer
+    Dim i As Long
+    Dim j As Long
+    Dim obj As Object
+    Dim v As Variant
+    '
+    If indentSpaces > 0 Then
+        beautify = True
+        If indentSpaces > maxIndent Then indentSpaces = maxIndent
+        colonLen = 2
+        nLineLen = Len(vbNewLine)
+        spCount = indentSpaces * initLevels 'Sufficient for most cases
+        spaces = Space$(spCount)
+    Else
+        colonLen = 1
+        indentSpaces = 0 'In case negative
+    End If
+    '
+    buff.Index = 1
+    ub = initLevels - 1
+    ReDim levels(0 To ub)
+    levels(0).incIndex = 1
+    '
+    If vars.sa.cDims = 0 Then
+        'Init memory accessors
+        InitAccessor VarPtr(ints), ints.sa, intSize
+        InitAccessor VarPtr(chars), chars.sa, intSize
+        InitAccessor VarPtr(ptrs), ptrs.sa, ptrSize
+        InitAccessor VarPtr(vars), vars.sa, variantSize
+        InitAccessor VarPtr(bounds), bounds.sa, longSize * 2
+        'Init maps
+        InitEncoded encoded
+        InitEscaped escaped, map
+        InitNumChar numChar
+        InitInfOrNaN infOrNaN
+        '
+        On Error Resume Next 'In case scrun.dll not available
+        Set obj = CreateObject("Scripting.Dictionary")
+        On Error GoTo 0
+        '
+        If Not obj Is Nothing Then
+            ptrs.sa.pvData = ObjPtr(obj)
+            ptrs.sa.rgsabound0.cElements = 1
+            vtblScriptPtr = ptrs.arr(0)
+        End If
+    End If
+    '
+    commaLen = 1 + nLineLen
+    encoded(epLBrace).sLen = commaLen
+    encoded(epLBracket).sLen = commaLen
+    '
+    'Point accesors to input data
+    vars.sa.pvData = VarPtr(jsonData)
+    ptrs.sa.pvData = vars.sa.pvData + pOffset
+    ints.sa.pvData = vars.sa.pvData
+    '
+    vars.sa.rgsabound0.cElements = 1
+    ptrs.sa.rgsabound0.cElements = 1
+    ints.sa.rgsabound0.cElements = 1
+    '
+    If vars.vt(0) And VT_BYREF Then
+        ptrs.sa.pvData = ptrs.arr(0)
+        fv.ptrs(0) = ptrs.arr(0)
+        fv.vt = vars.vt(0) Xor VT_BYREF
+        vars.sa.pvData = VarPtr(fv)
+    End If
+    '
+    Do
+        Dim vt As VbVarType: vt = vars.vt(0) And &H3FFF& 'Remove VT_BYREF
+        Do While vt = vbObject Or vt = vbDataObject
+            If vars.arr(0) Is Nothing Then GoTo InsertNull
+            '
+            Dim iUnk As IUnknown: Set iUnk = vars.arr(0)
+            Dim iPtr As LongPtr:  iPtr = ObjPtr(iUnk)
+            '
+            'Check for circular references
+            'For deep nesting might be worth implementing a Dictionary
+            For i = depth To 0 Step -1
+                If levels(i).iUnkPtr = iPtr Then
+                    If failIfCircularRef Then
+                        outError = "Circular reference detected"
+                        GoTo Clean
+                    End If
+                    GoTo InsertNull
+                End If
+            Next i
+            '
+            Dim coll As Collection
+            Dim dict As Dictionary
+            Dim isDict As Boolean
+            Dim isSerializable As Boolean: isSerializable = False
+            Dim isScripting As Boolean:    isScripting = False
+            '
+            isDict = (TypeOf vars.arr(0) Is Dictionary)
+            If isDict Then
+                Set dict = vars.arr(0)
+            ElseIf TypeOf vars.arr(0) Is Collection Then
+                Set coll = vars.arr(0)
+            Else
+                'Try 'Scripting.Dictionary' via late-binding
+                ptrs.sa.pvData = ObjPtr(vars.arr(0))
+                isScripting = (ptrs.arr(0) = vtblScriptPtr)
+                '
+                If isScripting Then
+                    Set obj = vars.arr(0)
+                    isDict = True
+                Else 'Try 'ToSerializable' via late-binding
+                    On Error Resume Next
+                    Assign v, vars.arr(0).ToSerializable
+                    isSerializable = (Err.Number = 0)
+                    On Error GoTo 0
+                    If Not isSerializable Then GoTo InsertNull
+                End If
+            End If
+            '
+            depth = depth + 1
+            If depth > ub Then
+                ub = ub * 2 - 1
+                ReDim Preserve levels(0 To ub)
+            End If
+            '
+            With levels(depth)
+                .isDict = isDict
+                If isDict Then
+                    If isScripting Then .ub = obj.Count - 1 _
+                                   Else .ub = dict.Count - 1
+                    If .ub = -1 Then
+                        ep = epDict
+                        .epClose = epFalse
+                    Else
+                        If isScripting Then .arrKeys = obj.Keys() _
+                                       Else .arrKeys = dict.Keys()
+                        '
+                        Dim vtKey As VbVarType
+                        Dim lastFound As Long: lastFound = -1
+                        For i = 0 To .ub
+                            If IsObject(.arrKeys(i)) Then
+                                vtKey = vbDataObject
+                            Else
+                                vtKey = VarType(.arrKeys(i))
+                            End If
+                            If vtKey = vbString Then
+                                lastFound = i
+                            ElseIf vtKey = vbNull Or vtKey = vbDataObject _
+                                                  Or vtKey > vbLongLong Then
+                                If failIfNonTextKeys Then
+                                    outError = "Invalid key data type"
+                                    GoTo Clean
+                                End If
+                                .arrKeys(i) = Empty
+                            ElseIf forceKeysToText Then
+                                If vtKey = vbDate Then
+                                    If formatDateISO Then
+                                        .arrKeys(i) = FormatISOExt(.arrKeys(i))
+                                    Else
+                                        .arrKeys(i) = Format$(.arrKeys(i), dateF)
+                                    End If
+                                ElseIf vtKey = vbError Then
+                                    ptrs.sa.pvData = VarPtr(.arrKeys(i)) + pOffset
+                                    #If x64 Then
+                                        j = CLng(ptrs.arr(0) And &H7FFFFFFF) Or &H80000000
+                                    #Else
+                                        j = ptrs.arr(0)
+                                    #End If
+                                    If j = errMissing Then
+                                        If failIfNonTextKeys Then
+                                            outError = "Invalid key data type"
+                                            GoTo Clean
+                                        Else
+                                            .arrKeys(i) = "Missing"
+                                        End If
+                                    Else
+                                        .arrKeys(i) = "Error " & CStr(j And &HFFFF&)
+                                    End If
+                                ElseIf vtKey = vbBoolean Then
+                                    .arrKeys(i) = encoded(CLng(.arrKeys(i))).s
+                                ElseIf (vtKey And &H14) <> &H4 Then 'Ints
+                                    .arrKeys(i) = CStr(.arrKeys(i))
+                                Else
+                                    Dim isInfOrNaN As Boolean: isInfOrNaN = False
+                                    If vt < vbCurrency Then 'Float
+                                        ints.sa.pvData = VarPtr(.arrKeys(i))
+                                        With infOrNaN(vt)
+                                            ints.sa.pvData = ints.sa.pvData + .Offset
+                                            isInfOrNaN = (ints.arr(0) And .Mask) = .Mask
+                                        End With
+                                    End If
+                                    .arrKeys(i) = CStr(.arrKeys(i))
+                                    If Not isInfOrNaN Then
+                                        ints.sa.pvData = StrPtr(.arrKeys(i))
+                                        ints.sa.rgsabound0.cElements = Len(.arrKeys(i))
+                                        For j = 0 To ints.sa.rgsabound0.cElements - 1
+                                            If numChar(ints.arr(j)) = 0 Then
+                                                ints.arr(j) = ccDot
+                                                Exit For
+                                            End If
+                                        Next j
+                                        ints.sa.rgsabound0.cElements = 1
+                                    End If
+                                End If
+                                lastFound = i
+                            ElseIf failIfNonTextKeys Then
+                                outError = TypeName(.arrKeys(i)) & " key found"
+                                GoTo Clean
+                            Else
+                                .arrKeys(i) = Empty
+                            End If
+                        Next i
+                        If lastFound < 0 Then
+                            .currIndex = .ub
+                            ep = epDict
+                            .epClose = epFalse
+                        Else
+                            .ub = lastFound
+                            .currIndex = -1
+                            ep = epLBrace
+                            .epClose = epRBrace
+                            .iUnkPtr = iPtr
+                            If isScripting Then .arrItems = obj.Items() _
+                                           Else .arrItems = dict.Items()
+                            If sortKeys Then
+                                QuickSortKeys .arrKeys, .arrItems, 0, .ub
+                            End If
+                            .firstItemPtr = VarPtr(.arrItems(0))
+                            .firstKeyPtr = VarPtr(.arrKeys(0))
+                            vars.sa.pvData = .firstKeyPtr
+                        End If
+                    End If
+                ElseIf isSerializable Then
+                    .ub = -1
+                    .epClose = epFalse
+                    .iUnkPtr = iPtr
+                    vars.sa.pvData = VarPtr(v)
+                    vt = vars.vt(0)
+                Else
+                    .ub = coll.Count - 1
+                    If .ub < 0 Then
+                        ep = epArray
+                        .epClose = epFalse
+                    Else
+                        ep = epLBracket
+                        .epClose = epRBracket
+                        .iUnkPtr = iPtr
+                        '
+                        'Iterate collection with dynamic iterator
+                        ReDim .arrItems(0 To .ub + 1) 'Extra member for safety
+                        .firstKeyPtr = VarPtr(.arrItems(0))
+                        '
+                        vars.sa.pvData = .firstKeyPtr
+                        '
+                        For Each vars.arr(0) In coll 'This actually works
+                            vars.sa.pvData = vars.sa.pvData + variantSize
+                        Next vars.arr(0)
+                        '
+                        vars.sa.pvData = .firstKeyPtr
+                        .currIndex = -1
+                    End If
+                End If
+                .incIndex = 1
+            End With
+            If Not isSerializable Then
+                vt = vbObject
+                Exit Do
+            End If
+        Loop
+        If vt = vbObject Then 'Do nothing - already handled
+        ElseIf vt >= vbArray Then
+            ptrs.sa.pvData = vars.sa.pvData + pOffset
+            If ptrs.arr(0) = NullPtr Then GoTo InsertNull 'Uninitialized
+            ptrs.sa.pvData = ptrs.arr(0) 'SAFEARRAY address
+            '
+            depth = depth + 1
+            If depth > ub Then
+                ub = ub * 2 - 1
+                ReDim Preserve levels(0 To ub)
+            End If
+            '
+            bounds.sa.pvData = ptrs.sa.pvData + rgsabound0_cElementsOffset
+            bounds.sa.rgsabound0.cElements = CLng(ptrs.arr(0) And &HFF&)
+            '
+            Dim totalElem As Long: totalElem = 1
+            '
+            For i = 0 To bounds.sa.rgsabound0.cElements - 1
+                totalElem = totalElem * bounds.rgsabound(i).cElements
+                If totalElem = 0 Then Exit For
+            Next i
+            '
+            With levels(depth)
+                .incIndex = 1
+                If totalElem = 0 Then
+                    .ub = -1
+                    ep = epArray
+                    .epClose = epFalse
+                Else
+                    ep = epLBracket
+                    .epClose = epRBracket
+                    .currIndex = -1
+                    If bounds.sa.rgsabound0.cElements = 1 Then
+                        .ub = totalElem - 1
+                        If vt = vbArray + vbVariant Then 'Just access data
+                            ptrs.sa.pvData = ptrs.sa.pvData + pvDataOffset
+                            .firstKeyPtr = ptrs.arr(0)
+                        Else 'Copy
+                            ReDim .arrItems(0 To .ub)
+                            .firstKeyPtr = VarPtr(.arrItems(0))
+                            j = bounds.rgsabound(0).lLbound
+                            bounds.rgsabound(0).lLbound = 0
+                            If vt = vbArray + vbObject Then
+                                For i = 0 To .ub
+                                    Set .arrItems(i) = vars.arr(0)(i)
+                                Next i
+                            Else
+                                For i = 0 To .ub
+                                    .arrItems(i) = vars.arr(0)(i)
+                                Next i
+                            End If
+                            bounds.rgsabound(0).lLbound = j
+                        End If
+                        vars.sa.pvData = .firstKeyPtr
+                    Else 'Multi-Dimensional
+                        .ub = bounds.sa.rgsabound0.cElements - 1
+                        .ub = bounds.rgsabound(.ub).cElements - 1
+                        ReDim .arrItems(0 To .ub)
+                        NDArrayToCollections .arrItems, vars.arr(0), bounds _
+                                                      , totalElem, ptrs.arr(0)
+                        .firstKeyPtr = VarPtr(.arrItems(0))
+                        vars.sa.pvData = .firstKeyPtr
+                    End If
+                End If
+            End With
+            bounds.sa.rgsabound0.cElements = 0
+            bounds.sa.pvData = NullPtr
+        ElseIf vt <= vbNull Or vt >= vbUserDefinedType Then 'Empty, Null or UDT
+'Or by jump: Nothing, Unsupported Interface, Uninitialized Array, +-Inf, [SQ]NaN
+InsertNull: ep = epNull
+        ElseIf vt = vbBoolean Then
+            ep = CLng(vars.arr(0))
+        Else
+            If vt = vbString Then
+                ints.sa.pvData = StrPtr(vars.arr(0))
+                ints.sa.rgsabound0.cElements = Len(vars.arr(0))
+                '
+                If ints.sa.rgsabound0.cElements = 0 Then
+                    encoded(epText).s = """"""
+                    encoded(epText).sLen = 2
+                Else
+                    'Just in case each character needs to be escaped
+                    i = buff.Index + ints.sa.rgsabound0.cElements * 6 _
+                                   + currentIndent + 1
+                    If i > buff.Limit Then
+                        j = buff.Limit
+                        If i And maxBit Then buff.Limit = maxBuf _
+                                        Else buff.Limit = i * 2
+                        buff.Text = buff.Text & Space$(buff.Limit - j)
+                    End If
+                    If currentIndent > 0 Then
+                        Mid$(buff.Text, buff.Index, currentIndent) = spaces
+                        buff.Index = buff.Index + currentIndent
+                        tempIndent = currentIndent
+                        currentIndent = 0
+                    End If
+                    '
+                    chars.sa.pvData = StrPtr(buff.Text) + buff.Index * 2
+                    chars.sa.rgsabound0.cElements = i - buff.Index
+                    Mid$(buff.Text, buff.Index) = """"
+                    buff.Index = buff.Index + 1
+                    '
+                    Dim ch As Integer
+                    i = 0
+                    j = 0
+                    For i = 0 To ints.sa.rgsabound0.cElements - 1
+                        ch = ints.arr(i)
+                        If ch >= ccSpace And ch < ccDel Then
+                            If ch = ccDoubleQuote Or ch = ccBackslash Then
+                                chars.arr(j) = ccBackslash
+                                j = j + 1
+                            End If
+                            chars.arr(j) = ch
+                            j = j + 1
+                        ElseIf (ch And &HFFE0) = 0 Then 'Escape U+0000 to U+001F
+                            Mid$(buff.Text, buff.Index + j) = escaped(ch).s
+                            j = j + escaped(ch).sLen
+                        ElseIf escapeNonASCII Then
+                            'Note we included non-printable ASCII DEL (127)
+                            Dim k As Long: k = buff.Index + j
+                            Mid$(buff.Text, k) = "\u00"
+                            Mid$(buff.Text, k + 2) = map((ch + &H10000) \ &H100& And &HFF&)
+                            Mid$(buff.Text, k + 4) = map(ch And &HFF&)
+                            j = j + 6
+                        Else
+                            chars.arr(j) = ch
+                            j = j + 1
+                        End If
+                    Next i
+                    '
+                    chars.sa.rgsabound0.cElements = 0
+                    chars.sa.pvData = NullPtr
+                    buff.Index = buff.Index + j
+                    '
+                    encoded(epText).s = """"
+                    encoded(epText).sLen = 1
+                End If
+                ints.sa.rgsabound0.cElements = 1
+            ElseIf vt = vbError Then
+                ptrs.sa.pvData = vars.sa.pvData + pOffset
+                #If x64 Then
+                    i = CLng(ptrs.arr(0) And &H7FFFFFFF) Or &H80000000
+                #Else
+                    i = ptrs.arr(0)
+                #End If
+                If i = errMissing Then GoTo InsertNull
+                encoded(epText).s = """Error " & CStr(i And &HFFFF&) & """"
+                encoded(epText).sLen = Len(encoded(epText).s)
+            ElseIf vt = vbDate Then 'Quotes already included in formatting
+                If formatDateISO Then
+                    encoded(epText).s = """" & FormatISOExt(vars.arr(0)) & """"
+                Else
+                    encoded(epText).s = Format$(vars.arr(0), dateFStr)
+                End If
+                encoded(epText).sLen = Len(encoded(epText).s)
+            ElseIf (vt And &H14) <> &H4 Then 'Byte, Integer, Long, LongLong
+                encoded(epText).s = CStr(vars.arr(0))
+                encoded(epText).sLen = Len(encoded(epText).s)
+            Else
+                If vt < vbCurrency Then 'Float - check for +-Inf, [SQ]NaN
+                    With infOrNaN(vt)
+                        ints.sa.pvData = vars.sa.pvData + .Offset
+                        If (ints.arr(0) And .Mask) = .Mask Then GoTo InsertNull
+                    End With
+                End If
+                encoded(epText).s = CStr(vars.arr(0))
+                encoded(epText).sLen = Len(encoded(epText).s)
+                '
+                'Fix dot if it's something else e.g. comma, quote, space etc.
+                ints.sa.pvData = StrPtr(encoded(epText).s)
+                ints.sa.rgsabound0.cElements = encoded(epText).sLen
+                For i = 0 To ints.sa.rgsabound0.cElements - 1
+                    If numChar(ints.arr(i)) = 0 Then
+                        ints.arr(i) = ccDot
+                        Exit For
+                    End If
+                Next i
+                ints.sa.rgsabound0.cElements = 1
+            End If
+            ep = epText
+        End If
+        '
+        Do
+            i = buff.Index + encoded(ep).sLen + currentIndent
+            If i + commaLen > buff.Limit Then 'Increase buffer capacity
+                j = buff.Limit
+                If i And maxBit Then buff.Limit = maxBuf Else buff.Limit = i * 2
+                buff.Text = buff.Text & Space$(buff.Limit - j)
+            End If
+            If beautify Then
+                If currentIndent = 0 Then
+                    currentIndent = tempIndent
+                    tempIndent = 0
+                Else
+                    Mid$(buff.Text, buff.Index, currentIndent) = spaces
+                    buff.Index = buff.Index + currentIndent
+                End If
+            End If
+            Mid$(buff.Text, buff.Index) = encoded(ep).s
+            buff.Index = i
+            '
+            Dim isNotLastItem As Boolean
+            Do
+                With levels(depth)
+                    isNotLastItem = (.currIndex < .ub) Or (.incIndex = 0)
+                End With
+                If isNotLastItem Then Exit Do
+                '
+                ep = levels(depth).epClose
+                depth = depth - 1
+                If depth < 0 Then Exit Do
+            Loop While ep = epFalse
+            If isNotLastItem Or depth < 0 Then Exit Do
+            '
+            If beautify Then
+                Mid$(buff.Text, buff.Index) = vbNewLine
+                buff.Index = buff.Index + nLineLen
+                currentIndent = currentIndent - indentSpaces
+            End If
+        Loop
+        If depth < 0 Then Exit Do
+        '
+        With levels(depth)
+            .currIndex = .currIndex + .incIndex
+            If .currIndex = 0 Then
+                If beautify And (.incIndex > 0) Then
+                    currentIndent = currentIndent + indentSpaces
+                    If currentIndent > spCount Then
+                        spCount = currentIndent * 2
+                        spaces = Space$(spCount)
+                    End If
+                End If
+            ElseIf .incIndex > 0 Then
+                Mid$(buff.Text, buff.Index, commaLen) = encoded(epComma).s
+                buff.Index = buff.Index + commaLen
+                vars.sa.pvData = .firstKeyPtr + variantSize * .currIndex
+            End If
+            If .isDict Then
+                If .incIndex = 0 Then
+                    Const colonSpace As String = ": "
+                    Mid$(buff.Text, buff.Index, colonLen) = colonSpace
+                    buff.Index = buff.Index + colonLen
+                    vars.sa.pvData = .firstItemPtr + variantSize * .currIndex
+                    tempIndent = currentIndent
+                    currentIndent = 0
+                    .incIndex = 1
+                Else
+                    Do While vars.vt(0) = vbEmpty 'Skip key
+                        .currIndex = .currIndex + 1
+                        vars.sa.pvData = vars.sa.pvData + variantSize
+                    Loop
+                    .incIndex = 0
+                End If
+            End If
+        End With
+    Loop
+    If jpCode = jpCodeUTF16LE Then
+        Serialize = Left$(buff.Text, buff.Index - 1)
+    ElseIf jpCode = jpCodeUTF16BE Then
+        ReverseBytes StrPtr(buff.Text), (buff.Index - 1) * 2, Serialize
+    ElseIf Encode(StrPtr(buff.Text), buff.Index - 1, jpCode, Serialize, i, _
+                    , outError, failIfInvalidCharacter) Then
+        Serialize = LeftB(Serialize, i)
+    Else
+        Serialize = vbNullString
+    End If
+Clean:
+    ints.sa.rgsabound0.cElements = 0: ints.sa.pvData = NullPtr
+    ptrs.sa.rgsabound0.cElements = 0: ptrs.sa.pvData = NullPtr
+    vars.sa.rgsabound0.cElements = 0: vars.sa.pvData = NullPtr
+End Function
+
+Private Sub Assign(ByRef varLeft As Variant, ByRef varRight As Variant)
+    If IsObject(varRight) Then Set varLeft = varRight Else varLeft = varRight
+End Sub
+
+Private Sub InitEncoded(ByRef encoded() As EncodedString)
+    encoded(epTrue).s = "true"
+    encoded(epFalse).s = "false"
+    encoded(epNull).s = "null"
+    encoded(epArray).s = "[]"
+    encoded(epDict).s = "{}"
+    encoded(epLBrace).s = "{" & vbNewLine
+    encoded(epRBrace).s = "}"
+    encoded(epLBracket).s = "[" & vbNewLine
+    encoded(epRBracket).s = "]"
+    encoded(epComma).s = "," & vbNewLine
+    Dim i As Long
+    For i = [_epMin] To [_epMax]
+        encoded(i).sLen = Len(encoded(i).s)
+    Next i
+End Sub
+Private Sub InitEscaped(ByRef escapedControls() As EncodedString _
+                      , ByRef hexMax() As String)
+    Dim i As Long
+    '
+    For i = &H0 To &H9
+        hexMax(i) = Chr$(i + 48)
+    Next i
+    For i = &HA To &HF
+        hexMax(i) = Chr$(i + 55)
+    Next i
+    For i = &H10 To &HFF
+        hexMax(i) = hexMax(i \ &H10) & hexMax(i And &HF)
+    Next i
+    For i = &H0 To &HF
+         hexMax(i) = "0" & hexMax(i)
+    Next i
+    '
+    escapedControls(ccBack).s = "\b"
+    escapedControls(ccTab).s = "\t"
+    escapedControls(ccLf).s = "\n"
+    escapedControls(ccFormFeed).s = "\f"
+    escapedControls(ccCr).s = "\r"
+    '
+    For i = ccBack To ccCr
+        escapedControls(i).sLen = 2
+    Next i
+    escapedControls(11).sLen = 0
+    '
+    For i = ccNull To ccSpace - 1
+        If escapedControls(i).sLen = 0 Then
+            escapedControls(i).sLen = 6
+            escapedControls(i).s = "\u00" & hexMax(i)
+        End If
+    Next i
+End Sub
+
+Private Sub InitNumChar(ByRef numChar() As Byte)
+    Dim i As Long
+    For i = ccZero To ccNine
+        numChar(i) = 1
+    Next i
+    numChar(ccPlus) = 1
+    numChar(ccMinus) = 1
+    numChar(ccCapitalE) = 1
+End Sub
+
+Private Sub InitInfOrNaN(ByRef infOrNaN() As InfOrNaNInfo)
+    infOrNaN(vbSingle).Mask = &H7F80
+    infOrNaN(vbDouble).Mask = &H7FF0
+    infOrNaN(vbSingle).Offset = 10
+    infOrNaN(vbDouble).Offset = 14
+End Sub
+
+'Adds values, row-wise, from a multi-dimensional array into nested collections
+'Based on method with same name at:
+'https://github.com/cristianbuse/VBA-ArrayTools/blob/master/src/LibArrayTools.bas
+Private Sub NDArrayToCollections(ByRef arr() As Variant _
+                               , ByRef src As Variant _
+                               , ByRef bounds As SABoundAccessor _
+                               , ByVal totalElem As Long _
+                               , ByRef cDimsPtr As LongPtr)
+#If x64 Then
+    Const dimMask As LongLong = &HFFFFFFFFFFFFFF00^
+#Else
+    Const dimMask As Long = &HFFFFFF00
+#End If
+    Dim rgsabound0 As SAFEARRAYBOUND
+    Dim rowMajorIndexes() As Long
+    Dim depth() As Long
+    Dim i As Long
+    Dim ub As Long: ub = bounds.sa.rgsabound0.cElements - 1
+    '
+    ReDim depth(0 To ub)
+    depth(0) = 1
+    For i = 1 To ub
+        depth(i) = depth(i - 1) * bounds.rgsabound(i - 1).cElements
+    Next i
+    '
+    ReDim rowMajorIndexes(0 To totalElem - 1)
+    AddRowMajorIndexes rowMajorIndexes, bounds.rgsabound, depth, 0, ub, 0, 0
+    '
+    'Make source one-dimensional
+    rgsabound0 = bounds.rgsabound(0)
+    cDimsPtr = (cDimsPtr And dimMask) Or 1
+    bounds.rgsabound(0).cElements = totalElem
+    bounds.rgsabound(0).lLbound = 0
+    '
+    'Populate
+    Dim j As Long 'Acts as an index and needs to be incremented ByRef
+    For i = 0 To bounds.rgsabound(ub).cElements - 1
+        Set arr(i) = AddCollections(rowMajorIndexes, src, bounds.rgsabound _
+                                  , ub - 1, rgsabound0.cElements, j)
+    Next i
+    '
+    'Restore source to multi-dimensional
+    bounds.rgsabound(0) = rgsabound0
+    cDimsPtr = (cDimsPtr And dimMask) Or bounds.sa.rgsabound0.cElements
+End Sub
+Private Sub AddRowMajorIndexes(ByRef arr() As Long _
+                             , ByRef rgsabound() As SAFEARRAYBOUND _
+                             , ByRef depth() As Long _
+                             , ByVal currDim As Long _
+                             , ByVal lastDim As Long _
+                             , ByVal colWiseIndex As Long _
+                             , ByRef rowWiseIndex As Long)
+    Dim i As Long
+    If currDim = lastDim Then
+        For i = 0 To rgsabound(currDim).cElements - 1
+            arr(colWiseIndex + i * depth(currDim)) = rowWiseIndex
+            rowWiseIndex = rowWiseIndex + 1
+        Next i
+    Else
+        Dim nextDim As Long: nextDim = currDim + 1
+        For i = 0 To rgsabound(currDim).cElements - 1
+            AddRowMajorIndexes arr, rgsabound, depth, nextDim, lastDim _
+                             , colWiseIndex + i * depth(currDim), rowWiseIndex
+        Next i
+    End If
+End Sub
+Private Function AddCollections(ByRef arrIndex() As Long _
+                              , ByRef arrData As Variant _
+                              , ByRef rgsabound() As SAFEARRAYBOUND _
+                              , ByVal currDim As Long _
+                              , ByVal firstSize As Long _
+                              , ByRef elemIndex As Long) As Collection
+    Dim collResult As New Collection
+    Dim i As Long
+    If currDim = 0 Then
+        For i = 1 To firstSize
+            collResult.Add arrData(arrIndex(elemIndex))
+            elemIndex = elemIndex + 1
+        Next i
+    Else
+        Dim prevDim As Long: prevDim = currDim - 1
+        For i = 1 To rgsabound(currDim).cElements
+            collResult.Add AddCollections(arrIndex, arrData, rgsabound _
+                                        , prevDim, firstSize, elemIndex)
+        Next i
+    End If
+    Set AddCollections = collResult
+End Function
+
+'Uses the yyyy-mm-ddThh:nn:ss.sZ extended format
+Private Function FormatISOExt(ByRef vDate As Variant) As String
+    Const secondsPerDay As Double = 86400
+    Const usPerSecond As Double = 1000000
+    Dim days As Double: days = vDate
+    Dim frac As Double: frac = (days - Int(days)) * secondsPerDay
+    '
+    frac = CLng((frac - Int(frac)) * usPerSecond) / usPerSecond
+    If frac = 0 Or frac = 1 Then
+        FormatISOExt = Format$(days, "yyyy-mm-ddThh:nn:ssZ")
+    Else
+        days = days - frac / secondsPerDay 'Avoid rounding
+        FormatISOExt = Format$(days, "yyyy-mm-ddThh:nn:ss") _
+                     & "." & Int(frac * 1000) & "Z"
+    End If
+End Function
+
+'This is not a 'Stable' Sort i.e. equal values do not preserve their order
+'https://en.wikipedia.org/wiki/Quicksort
+Private Sub QuickSortKeys(ByRef arrKeys() As Variant _
+                        , ByRef arrItems() As Variant _
+                        , ByVal lb As Long _
+                        , ByVal ub As Long)
+    If lb >= ub Then Exit Sub
+    '
+    Dim newLB As Long: newLB = lb
+    Dim newUB As Long: newUB = ub
+    Dim p As Long:     p = (lb + ub) \ 2
+    '
+    Do While newLB <= newUB
+        Do While newLB < ub
+            If arrKeys(newLB) >= arrKeys(p) Then Exit Do
+            newLB = newLB + 1
+        Loop
+        Do While newUB > lb
+            If arrKeys(p) >= arrKeys(newUB) Then Exit Do
+            newUB = newUB - 1
+        Loop
+        If newLB <= newUB Then
+            If newLB <> newUB Then 'Swap
+                'Can be more efficient if using memory accessors
+                Dim setL As Boolean: setL = IsObject(arrItems(newLB))
+                Dim setU As Boolean: setU = IsObject(arrItems(newUB))
+                Dim v As Variant:    v = arrKeys(newLB) 'Keys are Text or Empty
+                '
+                arrKeys(newLB) = arrKeys(newUB)
+                arrKeys(newUB) = v
+                If setL Then Set v = arrItems(newLB) Else v = arrItems(newLB)
+                If setU Then Set arrItems(newLB) = arrItems(newUB) _
+                             Else arrItems(newLB) = arrItems(newUB)
+                If setL Then Set arrItems(newUB) = v Else arrItems(newUB) = v
+            End If
+            newLB = newLB + 1
+            newUB = newUB - 1
+        End If
+    Loop
+    QuickSortKeys arrKeys, arrItems, lb, newUB
+    QuickSortKeys arrKeys, arrItems, newLB, ub
+End Sub
+
+'Converts from VBA's internal UTF-16LE to 'jpCode'
+Private Function Encode(ByVal jsonPtr As LongPtr _
+                      , ByVal charCount As Long _
+                      , ByVal jpCode As JsonPageCode _
+                      , ByRef outBuff As String _
+                      , Optional ByRef outBuffSize As Long _
+                      , Optional ByRef outBuffPtr As LongPtr _
+                      , Optional ByRef outErrDesc As String _
+                      , Optional ByVal failIfInvalidCharacter As Boolean) As Boolean
+#If Mac Then
+    outBuff = Space$(charCount)
+    outBuffSize = charCount * 2
+    outBuffPtr = StrPtr(outBuff)
+    '
+    Dim inBytesLeft As LongPtr:  inBytesLeft = outBuffSize
+    Dim outBytesLeft As LongPtr: outBytesLeft = outBuffSize
+    Static collDescriptors As New Collection
+    Dim cd As LongPtr
+    Dim defaultChar As String
+    Dim defPtr As LongPtr
+    Dim defSize As Long
+    Dim nonRev As LongPtr
+    Dim inPrevLeft As LongPtr
+    Dim outPrevLeft As LongPtr
+    '
+    Select Case jpCode
+    Case jpCodeUTF8:    defaultChar = ChrW$(&HBFEF) & ChrB$(&HBD) '0xFFFD UTF8
+    Case jpCodeUTF32LE: defaultChar = ChrW$(&HFFFD) & vbNullChar
+    Case jpCodeUTF32BE: defaultChar = vbNullChar & ChrW$(&HFFFD)
+    Case Else
+        outErrDesc = "Code Page: " & jpCode & " not supported"
+        Exit Function
+    End Select
+    defPtr = StrPtr(defaultChar)
+    defSize = LenB(defaultChar)
+    '
+    On Error Resume Next
+    cd = collDescriptors(CStr(jpCode))
+    On Error GoTo 0
+    '
+    If cd = NullPtr Then
+        Static descFrom As String
+        Dim descTo As String: descTo = PageCodeDesc(jpCode)
+        If LenB(descFrom) = 0 Then descFrom = PageCodeDesc(jpCodeUTF16LE)
+        cd = iconv_open(StrPtr(descTo), StrPtr(descFrom))
+        If cd = -1 Then
+            outErrDesc = "Unsupported page code conversion"
+            Exit Function
+        End If
+        collDescriptors.Add cd, CStr(jpCode)
+    End If
+    Do
+        memmove ByVal errno_location, 0&, longSize
+        inPrevLeft = inBytesLeft
+        outPrevLeft = outBytesLeft
+        nonRev = iconv(cd, jsonPtr, inBytesLeft, outBuffPtr, outBytesLeft)
+        If nonRev >= 0 Then Exit Do
+        Const EILSEQ As Long = 92
+        Const EINVAL As Long = 22
+        Dim errNo As Long: memmove errNo, ByVal errno_location, longSize
+        '
+        If (errNo = EILSEQ Eqv errNo = EINVAL) Or failIfInvalidCharacter _
+        Then
+            Select Case errNo
+                Case EILSEQ: outErrDesc = "Invalid character: "
+                Case EINVAL: outErrDesc = "Incomplete character sequence: "
+                Case Else:   outErrDesc = "Failed conversion: "
+            End Select
+            outErrDesc = outErrDesc & " to CP" & jpCode
+            Exit Function
+        End If
+        memmove ByVal outBuffPtr, ByVal defPtr, defSize
+        outBytesLeft = outBytesLeft - defSize
+        outBuffPtr = outBuffPtr + defSize
+        jsonPtr = jsonPtr + intSize
+        inBytesLeft = inBytesLeft - intSize
+    Loop
+    outBuffSize = outBuffSize - CLng(outBytesLeft)
+    outBuffPtr = StrPtr(outBuff)
+    Encode = True
+#Else
+    Const WC_ERR_INVALID_CHARS = 128
+    Dim byteCount As Long
+    Dim dwFlags As Long
+    '
+    If failIfInvalidCharacter Then
+        If jpCode = jpCodeUTF8 Then dwFlags = WC_ERR_INVALID_CHARS
+    End If
+    byteCount = WideCharToMultiByte(jpCode, dwFlags, jsonPtr, charCount _
+                                  , 0, 0, 0, 0)
+    If byteCount = 0 Then
+        Const ERROR_INVALID_PARAMETER      As Long = 87
+        Const ERROR_NO_UNICODE_TRANSLATION As Long = 1113
+        '
+        Select Case Err.LastDllError
+        Case ERROR_NO_UNICODE_TRANSLATION
+            outErrDesc = "Invalid CP" & jpCode & " character"
+        Case ERROR_INVALID_PARAMETER
+            outErrDesc = "Code Page: " & jpCode & " not supported"
+        Case Else
+            outErrDesc = "Unicode conversion failed"
+        End Select
+        Exit Function
+    End If
+    '
+    outBuff = Space$((byteCount + 1) \ 2)
+    If byteCount Mod 2 = 1 Then outBuff = LeftB$(outBuff, byteCount)
+    outBuffPtr = StrPtr(outBuff)
+    outBuffSize = byteCount
+    '
+    byteCount = WideCharToMultiByte(jpCode, dwFlags, jsonPtr, charCount _
+                                  , outBuffPtr, byteCount, 0, 0)
+    Encode = (byteCount = outBuffSize)
+    If Not Encode Then outErrDesc = "Unicode conversion failed"
+#End If
 End Function

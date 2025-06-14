@@ -39,7 +39,7 @@ Private Type ChatMessage
 End Type
 
 Private Type TextElement
-    ElementType As String ' "text", "emoji", "ping", "bold", "italic", "quote", "h1", "h2", "bullet"
+    ElementType As String ' "text", "emoji", "ping", "bold", "italic", "quote", "h1", "h2", "h3", "bullet", "small"
     Content As String
     X As Long
     Width As Long
@@ -47,19 +47,26 @@ Private Type TextElement
     IsBold As Boolean
     IsItalic As Boolean
 End Type
-
 Private TopIndex As Long
 Private Messages() As ChatMessage
 Private MessageCount As Long
 Private Const BaseLineHeight As Long = 16
 Private Const MessagePadding As Long = 4
 Private EmojiCache As Collection ' Cache loaded emojis
+Private IsUserScrolling As Boolean ' Track if user is manually scrolling
+Private AutoScrollEnabled As Boolean ' Track if autoscroll should happen
 
 Private Sub UserControl_Initialize()
     Set EmojiCache = New Collection
+    IsUserScrolling = False
+    AutoScrollEnabled = True
 End Sub
 
 Public Sub AddMessage(ByVal Username As String, ByVal Texts As String, Optional Avatar As StdPicture)
+    ' Check if we should autoscroll (only if user is at or near bottom)
+    Dim ShouldAutoScroll As Boolean
+    ShouldAutoScroll = AutoScrollEnabled And (vsbChat.Value >= vsbChat.Max - (BaseLineHeight * 2))
+    
     Dim Text() As String
     Text = Split(Texts, vbLf)
     Dim i As Integer
@@ -71,29 +78,45 @@ Public Sub AddMessage(ByVal Username As String, ByVal Texts As String, Optional 
         Messages(MessageCount).RenderedHeight = 0 ' Will be calculated during render
         MessageCount = MessageCount + 1
     Next
-    UserControl.Refresh
+    
     UpdateScrollbar
+    
+    ' Autoscroll to bottom if appropriate
+    If ShouldAutoScroll Then
+        ScrollToBottom
+    End If
+    
+    UserControl.Refresh
 End Sub
 
 Public Sub Clear()
     ReDim Messages(0)
     MessageCount = 0
+    IsUserScrolling = False
+    AutoScrollEnabled = True
     UserControl.Refresh
     vsbChat.Max = 0
 End Sub
 
+Private Sub ScrollToBottom()
+    If vsbChat.Max > 0 Then
+        vsbChat.Value = vsbChat.Max
+        TopIndex = vsbChat.Value
+    End If
+End Sub
+
 Private Sub UpdateScrollbar()
-    Dim TotalHeight As Long
+    Dim totalHeight As Long
     Dim i As Long
     
     For i = 0 To MessageCount - 1
         If Messages(i).RenderedHeight = 0 Then
             Messages(i).RenderedHeight = CalculateMessageHeight(i)
         End If
-        TotalHeight = TotalHeight + Messages(i).RenderedHeight + MessagePadding
+        totalHeight = totalHeight + Messages(i).RenderedHeight + MessagePadding
     Next i
     
-    vsbChat.Max = TotalHeight - UserControl.ScaleHeight
+    vsbChat.Max = totalHeight - UserControl.ScaleHeight
     If vsbChat.Max < 0 Then vsbChat.Max = 0
     vsbChat.LargeChange = UserControl.ScaleHeight \ 2
     vsbChat.SmallChange = BaseLineHeight
@@ -102,35 +125,35 @@ End Sub
 Private Function CalculateMessageHeight(ByVal MessageIndex As Long) As Long
     Dim AvatarSize As Long: AvatarSize = 32
     Dim Margin As Long: Margin = 8
-    Dim TextWidth As Long
+    Dim textWidth As Long
     Dim Elements As Collection
     Dim WrappedLines As Collection
     
-    TextWidth = UserControl.ScaleWidth - (Margin + AvatarSize + 16 + vsbChat.Width)
+    textWidth = UserControl.ScaleWidth - (Margin + AvatarSize + 16 + vsbChat.Width)
     Set Elements = ParseTextElements(Messages(MessageIndex).Text)
-    Set WrappedLines = WrapTextElements(Elements, TextWidth)
+    Set WrappedLines = WrapTextElements(Elements, textWidth)
     
     Dim MinHeight As Long
     MinHeight = AvatarSize + 4  ' Reduced padding
     
-    Dim TextHeight As Long
-    TextHeight = 14 + (WrappedLines.Count * BaseLineHeight) ' Username (14px) + text lines
+    Dim textHeight As Long
+    textHeight = 14 + (WrappedLines.Count * BaseLineHeight) ' Username (14px) + text lines
     
     ' Only use extra height if text actually wraps (more than 1 line) or has special formatting
     If WrappedLines.Count <= 1 And Not HasSpecialFormatting(Elements) Then
         CalculateMessageHeight = MinHeight
     Else
-        CalculateMessageHeight = IIf(MinHeight > TextHeight, MinHeight, TextHeight)
+        CalculateMessageHeight = IIf(MinHeight > textHeight, MinHeight, textHeight)
     End If
 End Function
 
 Private Function HasSpecialFormatting(ByVal Elements As Collection) As Boolean
     Dim i As Long
     For i = 1 To Elements.Count
-        Dim Element As Collection
-        Set Element = Elements(i)
+        Dim element As Collection
+        Set element = Elements(i)
         Dim ElementType As String
-        ElementType = Element("type")
+        ElementType = element.Item(1) ' Get type from first item
         
         If ElementType <> "text" And ElementType <> "emoji" And ElementType <> "ping" Then
             HasSpecialFormatting = True
@@ -141,6 +164,7 @@ Private Function HasSpecialFormatting(ByVal Elements As Collection) As Boolean
 End Function
 
 Private Function LoadEmoji(ByVal EmojiName As String) As StdPicture
+'MsgBox EmojiName
     On Error GoTo ErrHandler
     
     ' Check cache first
@@ -172,7 +196,6 @@ ErrHandler:
 End Function
 
 Private Function ParseTextElements(ByVal Text As String) As Collection
-
     Dim Elements As New Collection
     Dim i As Long
     Dim CurrentText As String
@@ -190,25 +213,32 @@ Private Function ParseTextElements(ByVal Text As String) As Collection
     ' Handle quotes (>)
     If Left(TrimmedText, 1) = ">" Then
         Dim QuoteElement As New Collection
-        QuoteElement.Add "quote", "type"
-        QuoteElement.Add Mid(TrimmedText, 2), "content"
+        QuoteElement.Add "quote" ' Type
+        QuoteElement.Add Mid(TrimmedText, 2) ' Content
         Elements.Add QuoteElement
         Set ParseTextElements = Elements
         Exit Function
     End If
     
-    ' Handle headers (# and ##)
-    If Left(TrimmedText, 2) = "##" Then
+    ' Handle headers (###, ##, #) - check longest first
+    If Left(TrimmedText, 3) = "###" Then
+        Dim H3Element As New Collection
+        H3Element.Add "h3" ' Type
+        H3Element.Add Trim(Mid(TrimmedText, 4)) ' Content
+        Elements.Add H3Element
+        Set ParseTextElements = Elements
+        Exit Function
+    ElseIf Left(TrimmedText, 2) = "##" Then
         Dim H2Element As New Collection
-        H2Element.Add "h2", "type"
-        H2Element.Add Trim(Mid(TrimmedText, 3)), "content"
+        H2Element.Add "h2" ' Type
+        H2Element.Add Trim(Mid(TrimmedText, 3)) ' Content
         Elements.Add H2Element
         Set ParseTextElements = Elements
         Exit Function
     ElseIf Left(TrimmedText, 1) = "#" Then
         Dim H1Element As New Collection
-        H1Element.Add "h1", "type"
-        H1Element.Add Trim(Mid(TrimmedText, 2)), "content"
+        H1Element.Add "h1" ' Type
+        H1Element.Add Trim(Mid(TrimmedText, 2)) ' Content
         Elements.Add H1Element
         Set ParseTextElements = Elements
         Exit Function
@@ -217,19 +247,19 @@ Private Function ParseTextElements(ByVal Text As String) As Collection
     ' Handle bullet points (* )
     If Left(TrimmedText, 2) = "* " Then
         Dim BulletElement As New Collection
-        BulletElement.Add "bullet", "type"
-        BulletElement.Add Trim(Mid(TrimmedText, 3)), "content"
+        BulletElement.Add "bullet" ' Type
+        BulletElement.Add Trim(Mid(TrimmedText, 3)) ' Content
         Elements.Add BulletElement
         Set ParseTextElements = Elements
         Exit Function
     End If
     
-    ' Handle small headers (-#)
+    ' Handle small text (-#)
     If Left(TrimmedText, 2) = "-#" Then
-        Dim SmallHeaderElement As New Collection
-        SmallHeaderElement.Add "h3", "type"
-        SmallHeaderElement.Add Trim(Mid(TrimmedText, 3)), "content"
-        Elements.Add SmallHeaderElement
+        Dim SmallElement As New Collection
+        SmallElement.Add "small" ' Type
+        SmallElement.Add Trim(Mid(TrimmedText, 3)) ' Content
+        Elements.Add SmallElement
         Set ParseTextElements = Elements
         Exit Function
     End If
@@ -248,8 +278,8 @@ Private Function ParseTextElements(ByVal Text As String) As Collection
                     ' End bold
                     If CurrentText <> "" Then
                         Dim BoldElement As New Collection
-                        BoldElement.Add "bold", "type"
-                        BoldElement.Add CurrentText, "content"
+                        BoldElement.Add "bold" ' Type
+                        BoldElement.Add CurrentText ' Content
                         Elements.Add BoldElement
                         CurrentText = ""
                     End If
@@ -258,8 +288,8 @@ Private Function ParseTextElements(ByVal Text As String) As Collection
                     ' Start bold - add any accumulated text first
                     If CurrentText <> "" Then
                         Dim TextElement As New Collection
-                        TextElement.Add "text", "type"
-                        TextElement.Add CurrentText, "content"
+                        TextElement.Add "text" ' Type
+                        TextElement.Add CurrentText ' Content
                         Elements.Add TextElement
                         CurrentText = ""
                     End If
@@ -272,8 +302,8 @@ Private Function ParseTextElements(ByVal Text As String) As Collection
                     ' End italic
                     If CurrentText <> "" Then
                         Dim ItalicElement As New Collection
-                        ItalicElement.Add "italic", "type"
-                        ItalicElement.Add CurrentText, "content"
+                        ItalicElement.Add "italic" ' Type
+                        ItalicElement.Add CurrentText ' Content
                         Elements.Add ItalicElement
                         CurrentText = ""
                     End If
@@ -282,8 +312,8 @@ Private Function ParseTextElements(ByVal Text As String) As Collection
                     ' Start italic - add any accumulated text first
                     If CurrentText <> "" Then
                         Dim TextElement2 As New Collection
-                        TextElement2.Add "text", "type"
-                        TextElement2.Add CurrentText, "content"
+                        TextElement2.Add "text" ' Type
+                        TextElement2.Add CurrentText ' Content
                         Elements.Add TextElement2
                         CurrentText = ""
                     End If
@@ -294,18 +324,18 @@ Private Function ParseTextElements(ByVal Text As String) As Collection
             ' Potential emoji start/end
             If InEmoji Then
                 ' End of emoji
-                Dim Element As New Collection
-                Element.Add "emoji", "type"
-                Element.Add EmojiName, "content"
-                Elements.Add Element
+                Dim EmojiElement As New Collection
+                EmojiElement.Add "emoji" ' Type
+                EmojiElement.Add EmojiName ' Content
+                Elements.Add EmojiElement
                 EmojiName = ""
                 InEmoji = False
             Else
                 ' Start of emoji - add any accumulated text first
                 If CurrentText <> "" Then
                     Dim TextElement3 As New Collection
-                    TextElement3.Add "text", "type"
-                    TextElement3.Add CurrentText, "content"
+                    TextElement3.Add "text" ' Type
+                    TextElement3.Add CurrentText ' Content
                     Elements.Add TextElement3
                     CurrentText = ""
                 End If
@@ -315,8 +345,8 @@ Private Function ParseTextElements(ByVal Text As String) As Collection
             ' Start of ping
             If CurrentText <> "" Then
                 Dim TextElement4 As New Collection
-                TextElement4.Add "text", "type"
-                TextElement4.Add CurrentText, "content"
+                TextElement4.Add "text" ' Type
+                TextElement4.Add CurrentText ' Content
                 Elements.Add TextElement4
                 CurrentText = ""
             End If
@@ -325,8 +355,8 @@ Private Function ParseTextElements(ByVal Text As String) As Collection
         ElseIf Char = ">" And InPing Then
             ' End of ping
             Dim PingElement As New Collection
-            PingElement.Add "ping", "type"
-            PingElement.Add PingContent, "content"
+            PingElement.Add "ping" ' Type
+            PingElement.Add PingContent ' Content
             Elements.Add PingElement
             PingContent = ""
             InPing = False
@@ -345,29 +375,29 @@ Private Function ParseTextElements(ByVal Text As String) As Collection
     If CurrentText <> "" Then
         Dim FinalElement As New Collection
         If InBold Then
-            FinalElement.Add "bold", "type"
+            FinalElement.Add "bold" ' Type
         ElseIf InItalic Then
-            FinalElement.Add "italic", "type"
+            FinalElement.Add "italic" ' Type
         Else
-            FinalElement.Add "text", "type"
+            FinalElement.Add "text" ' Type
         End If
-        FinalElement.Add CurrentText, "content"
+        FinalElement.Add CurrentText ' Content
         Elements.Add FinalElement
     End If
     
     ' Handle unclosed emoji
     If InEmoji And EmojiName <> "" Then
         Dim UnfinishedEmoji As New Collection
-        UnfinishedEmoji.Add "text", "type"
-        UnfinishedEmoji.Add ":" & EmojiName, "content"
+        UnfinishedEmoji.Add "text" ' Type
+        UnfinishedEmoji.Add ":" & EmojiName ' Content
         Elements.Add UnfinishedEmoji
     End If
     
     ' Handle unclosed ping
     If InPing And PingContent <> "" Then
         Dim UnfinishedPing As New Collection
-        UnfinishedPing.Add "text", "type"
-        UnfinishedPing.Add "<@" & PingContent, "content"
+        UnfinishedPing.Add "text" ' Type
+        UnfinishedPing.Add "<@" & PingContent ' Content
         Elements.Add UnfinishedPing
     End If
     
@@ -381,25 +411,25 @@ Private Function WrapTextElements(ByVal Elements As Collection, ByVal MaxWidth A
     Dim i As Long
     
     For i = 1 To Elements.Count
-        Dim Element As Collection
-        Set Element = Elements(i)
+        Dim element As Collection
+        Set element = Elements(i)
         
         Dim ElementType As String
         Dim Content As String
-        ElementType = Element("type")
-        Content = Element("content")
+        ElementType = element.Item(1) ' Type is first item
+        Content = element.Item(2) ' Content is second item
         
         Select Case ElementType
             Case "text", "bold", "italic"
                 ' Handle word wrapping for text elements
-                Dim Words() As String
-                Words = Split(Content, " ")
+                Dim words() As String
+                words = Split(Content, " ")
                 Dim j As Long
                 
-                For j = 0 To UBound(Words)
+                For j = 0 To UBound(words)
                     Dim Word As String
-                    Word = Words(j)
-                    If j < UBound(Words) Then Word = Word & " "
+                    Word = words(j)
+                    If j < UBound(words) Then Word = Word & " "
                     
                     Dim WordWidth As Long
                     WordWidth = GetTextWidth(Word, ElementType)
@@ -414,15 +444,15 @@ Private Function WrapTextElements(ByVal Elements As Collection, ByVal MaxWidth A
                     ' Add word to current line - create new Collection for each word
                     Dim WordElement As Collection
                     Set WordElement = New Collection
-                    WordElement.Add ElementType, "type"
-                    WordElement.Add Word, "content"
+                    WordElement.Add ElementType ' Type
+                    WordElement.Add Word ' Content
                     CurrentLine.Add WordElement
                     CurrentWidth = CurrentWidth + WordWidth
                 Next j
                 
-            Case Else ' emoji, ping, quote, h1, h2, bullet
+            Case Else ' emoji, ping, quote, h1, h2, h3, bullet, small
                 Dim ElementWidth As Long
-                ElementWidth = GetElementWidth(Element)
+                ElementWidth = GetElementWidth(element)
                 
                 If CurrentWidth + ElementWidth > MaxWidth And CurrentLine.Count > 0 Then
                     ' Start new line
@@ -431,7 +461,7 @@ Private Function WrapTextElements(ByVal Elements As Collection, ByVal MaxWidth A
                     CurrentWidth = 0
                 End If
                 
-                CurrentLine.Add Element
+                CurrentLine.Add element
                 CurrentWidth = CurrentWidth + ElementWidth
         End Select
     Next i
@@ -461,32 +491,33 @@ Private Function GetTextWidth(ByVal Text As String, ByVal ElementType As String)
             UserControl.FontSize = UserControl.FontSize + 2
             UserControl.FontBold = True
         Case "h3"
-            UserControl.FontSize = UserControl.FontSize + 1
             UserControl.FontBold = True
+        Case "small"
+            UserControl.FontSize = UserControl.FontSize - 2
     End Select
     
-    GetTextWidth = UserControl.TextWidth(Text)
+    GetTextWidth = UserControl.textWidth(Text)
     
     UserControl.FontBold = OldBold
     UserControl.FontSize = OldSize
 End Function
 
-Private Function GetElementWidth(ByVal Element As Collection) As Long
+Private Function GetElementWidth(ByVal element As Collection) As Long
     Dim ElementType As String
     Dim Content As String
-    ElementType = Element("type")
-    Content = Element("content")
+    ElementType = element.Item(1) ' Type
+    Content = element.Item(2) ' Content
     
     Select Case ElementType
         Case "emoji"
             GetElementWidth = 18
         Case "ping"
-            GetElementWidth = UserControl.TextWidth("@" & Content) + 4
+            GetElementWidth = UserControl.textWidth("@" & Content) + 4
         Case "quote"
-            GetElementWidth = UserControl.TextWidth("> " & Content)
+            GetElementWidth = UserControl.textWidth("> " & Content)
         Case "bullet"
-            GetElementWidth = UserControl.TextWidth("• " & Content)
-        Case "h3"
+            GetElementWidth = UserControl.textWidth("• " & Content)
+        Case "small"
             GetElementWidth = GetTextWidth(Content, ElementType)
         Case Else
             GetElementWidth = GetTextWidth(Content, ElementType)
@@ -496,11 +527,11 @@ End Function
 Private Sub DrawWrappedMessage(ByVal MessageIndex As Long, ByVal StartX As Long, ByVal StartY As Long)
     Dim Elements As Collection
     Dim WrappedLines As Collection
-    Dim TextWidth As Long
+    Dim textWidth As Long
     
-    TextWidth = UserControl.ScaleWidth - (StartX + 8 + vsbChat.Width)
+    textWidth = UserControl.ScaleWidth - (StartX + 8 + vsbChat.Width)
     Set Elements = ParseTextElements(Messages(MessageIndex).Text)
-    Set WrappedLines = WrapTextElements(Elements, TextWidth)
+    Set WrappedLines = WrapTextElements(Elements, textWidth)
     
     Dim LineY As Long
     LineY = StartY
@@ -521,13 +552,13 @@ Private Sub DrawParsedLine(ByVal Line As Collection, ByVal StartX As Long, ByVal
     Dim i As Long
     
     For i = 1 To Line.Count
-        Dim Element As Collection
-        Set Element = Line(i)
+        Dim element As Collection
+        Set element = Line(i)
         
         Dim ElementType As String
         Dim Content As String
-        ElementType = Element("type")
-        Content = Element("content")
+        ElementType = element.Item(1) ' Type
+        Content = element.Item(2) ' Content
         
         Select Case ElementType
             Case "text"
@@ -590,10 +621,17 @@ Private Sub DrawParsedLine(ByVal Line As Collection, ByVal StartX As Long, ByVal
                 UserControl.CurrentY = Y
                 UserControl.ForeColor = vbBlack
                 UserControl.FontBold = True
-                UserControl.FontSize = UserControl.FontSize + 1
                 UserControl.Print Content;
-                UserControl.FontSize = UserControl.FontSize - 1
                 UserControl.FontBold = False
+                CurrentX = UserControl.CurrentX
+                
+            Case "small"
+                UserControl.CurrentX = CurrentX
+                UserControl.CurrentY = Y
+                UserControl.ForeColor = vbBlack
+                UserControl.FontSize = UserControl.FontSize - 2
+                UserControl.Print Content;
+                UserControl.FontSize = UserControl.FontSize + 2
                 CurrentX = UserControl.CurrentX
                 
             Case "bullet"
@@ -607,7 +645,7 @@ Private Sub DrawParsedLine(ByVal Line As Collection, ByVal StartX As Long, ByVal
                 Dim EmojiPic As StdPicture
                 Set EmojiPic = LoadEmoji(Content)
                 If Not EmojiPic Is Nothing Then
-                    UserControl.PaintPicture EmojiPic, CurrentX, Y, 16, 16
+                    UserControl.PaintPicture EmojiPic, CurrentX, Y, 19, 19
                     CurrentX = CurrentX + 18
                 Else
                     ' Fallback to text if emoji not found
@@ -624,7 +662,7 @@ Private Sub DrawParsedLine(ByVal Line As Collection, ByVal StartX As Long, ByVal
                 PingText = "@" & Content
                 
                 Dim PingWidth As Long
-                PingWidth = UserControl.TextWidth(PingText)
+                PingWidth = UserControl.textWidth(PingText)
                 
                 ' Draw background with system highlight color
                 UserControl.Line (CurrentX - 2, Y - 1)-(CurrentX + PingWidth + 2, Y + 13), &H8000000D, BF
@@ -644,6 +682,10 @@ End Sub
 Private Sub UserControl_Resize()
     vsbChat.Move UserControl.ScaleWidth - vsbChat.Width, 0, vsbChat.Width, UserControl.ScaleHeight
     
+    ' Remember current scroll position relative to bottom
+    Dim WasAtBottom As Boolean
+    WasAtBottom = (vsbChat.Value >= vsbChat.Max - (BaseLineHeight * 2))
+    
     ' Recalculate message heights since width changed
     Dim i As Long
     For i = 0 To MessageCount - 1
@@ -651,17 +693,37 @@ Private Sub UserControl_Resize()
     Next i
     
     UpdateScrollbar
+    
+    ' If user was at bottom before resize, keep them at bottom
+    If WasAtBottom Then
+        ScrollToBottom
+    End If
+    
     UserControl.Refresh
 End Sub
 
 Private Sub vsbChat_Change()
     TopIndex = vsbChat.Value
     UserControl.Refresh
+    
+    ' Check if user manually scrolled away from bottom
+    If vsbChat.Value < vsbChat.Max - (BaseLineHeight * 2) Then
+        AutoScrollEnabled = False
+    Else
+        AutoScrollEnabled = True
+    End If
 End Sub
 
 Private Sub vsbChat_Scroll()
     TopIndex = vsbChat.Value
     UserControl.Refresh
+    
+    ' Check if user manually scrolled away from bottom
+    If vsbChat.Value < vsbChat.Max - (BaseLineHeight * 2) Then
+        AutoScrollEnabled = False
+    Else
+        AutoScrollEnabled = True
+    End If
 End Sub
 
 Private Sub UserControl_Paint()
@@ -701,3 +763,15 @@ Private Sub UserControl_Paint()
         CurrentY = CurrentY + Messages(i).RenderedHeight + MessagePadding
     Next i
 End Sub
+
+' Public method to manually scroll to bottom (useful for "scroll to bottom" button)
+Public Sub ForceScrollToBottom()
+    AutoScrollEnabled = True
+    ScrollToBottom
+    UserControl.Refresh
+End Sub
+
+' Public method to check if autoscroll is enabled
+Public Property Get IsAutoScrollEnabled() As Boolean
+    IsAutoScrollEnabled = AutoScrollEnabled
+End Property

@@ -1,5 +1,6 @@
 Attribute VB_Name = "mWebSocket"
 Option Explicit
+Private Declare Sub CopyMemory Lib "kernel32" Alias "RtlMoveMemory" (Destination As Any, Source As Any, ByVal Length As Long)
 
 'VBWebsocket 1.10 BETA
 ' =============================================================
@@ -171,7 +172,7 @@ Public Function MakeAcceptKey(ByVal strKey As String) As String
 
     Bytes = StrConv(strKey & MagicKey, vbFromUnicode)
 
-    If pvCryptoOptimizedSha1(retBytes, Bytes) Then
+    If pvCryptoHashSha1(retBytes, Bytes) Then
         MakeAcceptKey = EncBase64(retBytes)
     End If
 
@@ -230,7 +231,7 @@ Public Function URLEncode_UTF8(ByVal sText As String, Optional ByVal WeakEncode 
 
     Dim x1 As Long
     Dim x2 As Long
-    Dim Chars() As Byte
+    Dim chars() As Byte
     Dim Byte1 As Byte
     Dim Byte2 As Byte
     Dim UTF16 As Long
@@ -250,39 +251,39 @@ Public Function URLEncode_UTF8(ByVal sText As String, Optional ByVal WeakEncode 
         UTF16 = Byte2 * 256 + Byte1
 
         If UTF16 < &H80 Then
-            ReDim Chars(0) As Byte
-            Chars(0) = UTF16
+            ReDim chars(0) As Byte
+            chars(0) = UTF16
         ElseIf UTF16 < &H800 Then
-            ReDim Chars(1) As Byte
-            Chars(1) = &H80 + (UTF16 And &H3F)
+            ReDim chars(1) As Byte
+            chars(1) = &H80 + (UTF16 And &H3F)
             UTF16 = UTF16 \ &H40
-            Chars(0) = &HC0 + (UTF16 And &H1F)
+            chars(0) = &HC0 + (UTF16 And &H1F)
         Else
-            ReDim Chars(2) As Byte
-            Chars(2) = &H80 + (UTF16 And &H3F)
+            ReDim chars(2) As Byte
+            chars(2) = &H80 + (UTF16 And &H3F)
             UTF16 = UTF16 \ &H40
-            Chars(1) = &H80 + (UTF16 And &H3F)
+            chars(1) = &H80 + (UTF16 And &H3F)
             UTF16 = UTF16 \ &H40
-            Chars(0) = &HE0 + (UTF16 And &HF)
+            chars(0) = &HE0 + (UTF16 And &HF)
         End If
 
-        For x2 = 0 To UBound(Chars)
-            Select Case Chars(x2)
+        For x2 = 0 To UBound(chars)
+            Select Case chars(x2)
                 Case 48 To 57, 65 To 90, 97 To 122
-                    Mid(URLEncode_UTF8, FinalPos, 1) = Chr$(Chars(x2))
+                    Mid(URLEncode_UTF8, FinalPos, 1) = Chr$(chars(x2))
                     FinalPos = FinalPos + 1
                 Case 61, 38  ' "=" and "&"
                     If WeakEncode Then
-                        Mid(URLEncode_UTF8, FinalPos, 1) = Chr$(Chars(x2))
+                        Mid(URLEncode_UTF8, FinalPos, 1) = Chr$(chars(x2))
                         FinalPos = FinalPos + 1
                     Else
-                        sHex = ("%" & Hex$(Chars(x2)))
+                        sHex = ("%" & Hex$(chars(x2)))
                         HexLen = Len(sHex)
                         Mid(URLEncode_UTF8, FinalPos, HexLen) = sHex
                         FinalPos = FinalPos + HexLen
                     End If
                 Case Else
-                    sHex = ("%" & Hex$(Chars(x2)))
+                    sHex = ("%" & Hex$(chars(x2)))
                     HexLen = Len(sHex)
                     Mid(URLEncode_UTF8, FinalPos, HexLen) = sHex
                     FinalPos = FinalPos + HexLen
@@ -347,7 +348,7 @@ Public Function AnalyzeData(ByteBuff() As Byte, Optional ByVal StartIndex As Lon
 
     Dim DF As DataFrame
     Dim PacketType As Byte
-    Dim L(3) As Byte
+    Dim l(3) As Byte
 
     DF.FIN = ((ByteBuff(StartIndex) And &H80) = &H80)
 
@@ -381,10 +382,10 @@ Public Function AnalyzeData(ByteBuff() As Byte, Optional ByVal StartIndex As Lon
     ElseIf PacketType = 126 Then
 
         'payload length is in byte 2 and 3
-        L(0) = ByteBuff(StartIndex + 3)
-        L(1) = ByteBuff(StartIndex + 2)
+        l(0) = ByteBuff(StartIndex + 3)
+        l(1) = ByteBuff(StartIndex + 2)
 
-        CopyMemory DF.PayloadLen, L(0), 4
+        CopyMemory DF.PayloadLen, l(0), 4
         DF.DataOffset = StartIndex + 4
 
     ElseIf PacketType = 127 Then
@@ -392,12 +393,12 @@ Public Function AnalyzeData(ByteBuff() As Byte, Optional ByVal StartIndex As Lon
         'bytes 2,3,4,5,6,7,8,9 hold the big-endian (network byte order) data length
         'we only get 4 bytes because that is all we will handle. If this becomes a major
         'problem in the future we can start using double to store the value
-        L(0) = ByteBuff(StartIndex + 9)
-        L(1) = ByteBuff(StartIndex + 8)
-        L(2) = ByteBuff(StartIndex + 7)
-        L(3) = ByteBuff(StartIndex + 6)
+        l(0) = ByteBuff(StartIndex + 9)
+        l(1) = ByteBuff(StartIndex + 8)
+        l(2) = ByteBuff(StartIndex + 7)
+        l(3) = ByteBuff(StartIndex + 6)
 
-        CopyMemory DF.PayloadLen, L(0), 4&
+        CopyMemory DF.PayloadLen, l(0), 4&
         DF.DataOffset = StartIndex + 10
 
     End If
@@ -439,7 +440,7 @@ Public Function CompileMessage(ByteData() As Byte, ByVal ByteLength As Long, Opt
     Dim mKey(3) As Byte
     Dim i As Long, j As Long
     Dim ByteBuff() As Byte
-    Dim L(3) As Byte
+    Dim l(3) As Byte
 
 
     'mask the data per rfc6455
@@ -499,11 +500,11 @@ Public Function CompileMessage(ByteData() As Byte, ByVal ByteLength As Long, Opt
         ByteBuff(1) = CByte(&HFE)       ' fixed mask bit + 126
 
         'copy low-order bytes from data length
-        CopyMemory L(0), ByteLength, 2
+        CopyMemory l(0), ByteLength, 2
 
         'swap in network byte order
-        ByteBuff(2) = L(1)
-        ByteBuff(3) = L(0)
+        ByteBuff(2) = l(1)
+        ByteBuff(3) = l(0)
 
         If ByteLength Then
             'copy the masking key we used
@@ -530,13 +531,13 @@ Public Function CompileMessage(ByteData() As Byte, ByVal ByteLength As Long, Opt
         ByteBuff(1) = CByte(&HFF)       ' fixed mask bit + 127
 
         'copy length to temp 4 byte buffer
-        CopyMemory L(0), ByteLength, 4&
+        CopyMemory l(0), ByteLength, 4&
 
         'swap the bytes (big-endian,network order)
-        ByteBuff(9) = L(0)
-        ByteBuff(8) = L(1)
-        ByteBuff(7) = L(2)
-        ByteBuff(6) = L(3)
+        ByteBuff(9) = l(0)
+        ByteBuff(8) = l(1)
+        ByteBuff(7) = l(2)
+        ByteBuff(6) = l(3)
 
         'bytes 2-5 are unused, because we dont handle data that large
 
@@ -604,15 +605,15 @@ End Function
 'generate the client secret key
 Function GenerateSecretKey(ByVal nSize As Long) As Byte()
 
-    Dim K() As Byte, X As Long
+    Dim k() As Byte, X As Long
 
-    ReDim K(nSize - 1) As Byte
+    ReDim k(nSize - 1) As Byte
 
     For X = 0 To nSize - 1
-        K(X) = CByte(RandomNumber(33, 255))    'using (mostly) printable characters
+        k(X) = CByte(RandomNumber(33, 255))    'using (mostly) printable characters
     Next X
 
-    GenerateSecretKey = K
+    GenerateSecretKey = k
 
     'could also use pvCryptoRandomBytes()
 
@@ -623,20 +624,20 @@ End Function
 Function FormatProtocols(ByVal strProts As String) As String
 
     Dim X As Long
-    Dim Arr() As String
+    Dim arr() As String
 
     strProts = Trim$(strProts)
 
     If Len(strProts) Then
         If InStr(strProts, ",") Then
-            Arr = Split(strProts, ",")
+            arr = Split(strProts, ",")
         Else
-            ReDim Arr(0) As String
-            Arr(0) = strProts
+            ReDim arr(0) As String
+            arr(0) = strProts
         End If
 
-        For X = 0 To UBound(Arr)
-            FormatProtocols = FormatProtocols & Trim$(Arr(X)) & ", "
+        For X = 0 To UBound(arr)
+            FormatProtocols = FormatProtocols & Trim$(arr(X)) & ", "
         Next
 
         FormatProtocols = Left$(FormatProtocols, Len(FormatProtocols) - 2)

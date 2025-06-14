@@ -61,6 +61,7 @@ End Sub
 
 ' Update a guild's icon
 Public Sub UpdateGuildIcon(ByVal Index As Long, icon As StdPicture)
+MsgBox "hm"
     If Index >= 0 And Index < GuildCount Then
         Set Guilds(Index).icon = icon
         UserControl.Refresh
@@ -89,6 +90,31 @@ Public Property Let SelectedGuildIndex(ByVal Value As Long)
         UserControl.Refresh
     End If
 End Property
+
+' Get initials from guild name
+Private Function GetGuildInitials(ByVal guildName As String) As String
+    Dim words As Variant
+    Dim initials As String
+    Dim i As Integer
+    
+    ' Split the name by spaces
+    words = Split(Trim(guildName), " ")
+    
+    ' Get first letter of each word (up to 2 letters)
+    For i = 0 To UBound(words)
+        If Len(words(i)) > 0 Then
+            initials = initials + UCase(Left(words(i), 1))
+            If Len(initials) >= 2 Then Exit For
+        End If
+    Next i
+    
+    ' If we still don't have initials, use first 2 characters of the name
+    If Len(initials) = 0 And Len(guildName) > 0 Then
+        initials = UCase(Left(Trim(guildName), IIf(Len(Trim(guildName)) >= 2, 2, 1)))
+    End If
+    
+    GetGuildInitials = initials
+End Function
 
 ' Ensure a guild is visible in the viewport
 Private Sub EnsureVisible(ByVal Index As Long)
@@ -180,6 +206,7 @@ Private Sub UserControl_Paint()
     ' Clear the control
     UserControl.Cls
     
+                On Error Resume Next
     ' Calculate visible area accounting for scrollbar
     Dim paintWidth As Long
     paintWidth = UserControl.ScaleWidth - IIf(VScroll1.Visible, VScroll1.Width, 0)
@@ -190,6 +217,9 @@ Private Sub UserControl_Paint()
         ' Only draw if visible
         If Y + IconSize > 0 And Y < UserControl.ScaleHeight Then
             Dim bgColor As Long
+            Dim centerX As Long, centerY As Long
+            centerX = Padding + IconSize / 2
+            centerY = Y + IconSize / 2
             
             ' Determine background color based on state
             If i = SelectedIndex Then
@@ -197,19 +227,45 @@ Private Sub UserControl_Paint()
             ElseIf i = HoverIndex Then
                 bgColor = RGB(54, 57, 63) ' Hover - Discord dark gray
             Else
-                bgColor = BackColor
+                bgColor = RGB(54, 57, 63) ' Default dark gray like Discord
             End If
             
-            ' Draw background
-            UserControl.Line (Padding, Y)-(Padding + IconSize, Y + IconSize), bgColor, BF
-            
-            ' Draw icon
-            If Not Guilds(i).icon Is Nothing Then
-            On Error Resume Next
+            ' Draw icon or initials
+            If Not Guilds(i).icon Is Nothing And Guilds(i).icon.Handle <> 0 Then
+                ' Draw background rectangle for icon
+                UserControl.Line (Padding, Y)-(Padding + IconSize, Y + IconSize), bgColor, BF
+                
+                ' Draw the actual icon
+                On Error Resume Next
                 UserControl.PaintPicture Guilds(i).icon, Padding, Y, IconSize, IconSize
+                On Error GoTo 0
             Else
-                ' Draw placeholder if no icon
-                UserControl.Circle (Padding + IconSize / 2, Y + IconSize / 2), IconSize / 3, RGB(128, 128, 128)
+                ' Draw rectangular background for initials
+                UserControl.Line (Padding, Y)-(Padding + IconSize, Y + IconSize), bgColor, BF
+                
+                ' Set up font for initials
+                UserControl.FontName = "Tahoma"
+                UserControl.FontBold = True
+                UserControl.FontSize = IconSize / 4 ' Adjust size based on icon size
+                UserControl.ForeColor = RGB(255, 255, 255) ' White text
+                
+                ' Get and draw initials
+                Dim initials As String
+                initials = GetGuildInitials(Guilds(i).Name)
+                
+                ' Calculate text position to center it
+                Dim textWidth As Long, textHeight As Long
+                textWidth = UserControl.textWidth(initials)
+                textHeight = UserControl.textHeight(initials)
+                
+                Dim textX As Long, textY As Long
+                textX = centerX - textWidth / 2
+                textY = centerY - textHeight / 2
+                
+                ' Draw the initials
+                UserControl.CurrentX = textX
+                UserControl.CurrentY = textY
+                UserControl.Print initials
             End If
         End If
         
@@ -225,7 +281,6 @@ End Sub
 
 ' Initialize event
 Private Sub UserControl_Initialize()
-
     SelectedIndex = -1
     HoverIndex = -1
     GuildCount = 0

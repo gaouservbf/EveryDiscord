@@ -46,6 +46,7 @@ Event OnMessagePending(Handled As Boolean)
 Event BeforeNotify(ByVal EventMask As UcsAsyncSocketEventMaskEnum, Cancel As Boolean)
 Event AfterNotify(ByVal EventMask As UcsAsyncSocketEventMaskEnum)
 Event OnCertificate(Issuers As Object, Confirmed As Boolean)
+Event OnServerCertificate(Certificates As Object, PrivateKey As Object, Confirmed As Boolean)
 
 Public Enum UcsTlsLocalFeaturesEnum '--- bitmask
     ucsTlsSupportTls10 = 2 ^ 0
@@ -134,6 +135,10 @@ Private Const CERT_CHAIN_CACHE_END_CERT                 As Long = 1
 '--- for CertSetCertificateContextProperty
 Private Const CERT_OCSP_RESPONSE_PROP_ID                As Long = 70
 Private Const CERT_SET_PROPERTY_IGNORE_PERSIST_ERROR_FLAG As Long = &H80000000
+'--- for CryptQueryObject
+Private Const CERT_QUERY_OBJECT_BLOB                    As Long = 2
+Private Const CERT_QUERY_CONTENT_FLAG_ALL               As Long = &H3FFE
+Private Const CERT_QUERY_FORMAT_FLAG_BINARY             As Long = 2
 '--- OIDs
 Private Const szOID_RSA_RSA                             As String = "1.2.840.113549.1.1.1"
 Private Const szOID_ECC_CURVE_P256                      As String = "1.2.840.10045.3.1.7"
@@ -189,6 +194,8 @@ Private Declare Function CertFindExtension Lib "crypt32" (ByVal pszObjId As Stri
 Private Declare Function CertFindCertificateInStore Lib "crypt32" (ByVal hCertStore As Long, ByVal dwCertEncodingType As Long, ByVal dwFindFlags As Long, ByVal dwFindType As Long, pvFindPara As Any, ByVal pPrevCertContext As Long) As Long
 Private Declare Function CertSetCertificateContextProperty Lib "crypt32" (ByVal pCertContext As Long, ByVal dwPropId As Long, ByVal dwFlags As Long, pvData As Any) As Long
 Private Declare Function CertAddCertificateContextToStore Lib "crypt32" (ByVal hCertStore As Long, ByVal pCertContext As Long, ByVal dwAddDisposition As Long, ppStoreContext As Any) As Long
+Private Declare Function CryptQueryObject Lib "crypt32" (ByVal dwObjectType As Long, pvObject As Any, ByVal dwExpectedContentTypeFlags As Long, ByVal dwExpectedFormatTypeFlags As Long, ByVal dwFlags As Long, pdwMsgAndCertEncodingType As Long, pdwContentType As Long, pdwFormatType As Long, phCertStore As Long, phMsg As Long, ppvContext As Long) As Long
+Private Declare Function CryptMsgClose Lib "crypt32" (ByVal hCryptMsg As Long) As Long
 '--- cryptdlg
 Private Declare Function CertSelectCertificate Lib "cryptdlg" Alias "CertSelectCertificateA" (pCertSelectInfo As Any) As Long
 '--- NCrypt
@@ -675,7 +682,7 @@ StartTls:
     Else
         m_eLocalFeatures = LocalFeatures
     End If
-    If Not TlsInitServer(m_uCtx, m_sRemoteHostName, cCerts, cPrivKey, m_sAlpnProtocols, m_eLocalFeatures) Then
+    If Not TlsInitServer(m_uCtx, m_sRemoteHostName, cCerts, cPrivKey, m_sAlpnProtocols, m_eLocalFeatures, Me) Then
         GoTo QH
     End If
     '--- success
@@ -1024,6 +1031,7 @@ Public Function ShutDown() As Boolean
                 GoTo QH
             End If
         End If
+        m_oSocket.Close_
         '--- success
         ShutDown = True
     Else
@@ -1151,6 +1159,10 @@ Public Sub SetLastError(ByVal lValue As Long)
     pvSetLastError
     m_oSocket.SetLastError lValue
 End Sub
+
+Public Function NewInstance() As Object
+    Set NewInstance = New cTlsSocket
+End Function
 
 '= sync ==================================================================
 
@@ -1749,6 +1761,18 @@ Attribute FireOnCertificate.VB_MemberFlags = "40"
     End If
 End Function
 
+Public Function FireOnServerCertificate(Certificates As Collection, PrivKey As Collection) As Boolean
+    Dim oCallback       As Object
+    
+    Set oCallback = CallbackWeakRef
+    RaiseEvent OnServerCertificate(Certificates, PrivKey, FireOnServerCertificate)
+    If Not oCallback Is Nothing Then
+        On Error Resume Next
+        Call oCallback.NotifyOnServerCertificate(Certificates, PrivKey, FireOnServerCertificate)
+        On Error GoTo 0
+    End If
+End Function
+
 '= callbacks =============================================================
 
 Public Sub NotifyOnConnect()
@@ -2083,12 +2107,56 @@ Private Function pvPkiPemImportCertificates(ByVal vPemFiles As Variant, sPasswor
         pvPkiPemGetTextPortions sPemText, "RSA PRIVATE KEY", cPrivKey
         pvPkiPemGetTextPortions sPemText, "EC PRIVATE KEY", cPrivKey
         pvPkiPemGetTextPortions sPemText, "CERTIFICATE", cCerts
+        pvPkiPemGetTextPortions sPemText, "PKCS7", cCerts
+        For Each vKey In pvPkiPemGetTextPortions(sPemText, "PKCS7")
+            baEncrKey = vKey
+            pvPkiPemImportPkcs7CertStore baEncrKey, cCerts, cPrivKey
+        Next
     Next
     If pvCollectionCount(cPrivKey) > 0 Then
         '--- success
         pvPkiPemImportCertificates = True
     End If
 QH:
+End Function
+
+Private Function pvPkiPemImportPkcs7CertStore(baCertStore() As Byte, cCerts As Collection, cPrivKey As Collection) As Boolean
+    Const FUNC_NAME     As String = "pvPkiPemImportPkcs7CertStore"
+    Dim uBlob           As CRYPT_DATA_BLOB
+    Dim hPkcs7Store     As Long
+    Dim hCryptMsg       As Long
+    Dim pCertContext    As Long
+    Dim vErr            As Variant
+    
+    On Error GoTo EH
+    uBlob.pbData = VarPtr(baCertStore(0))
+    uBlob.cbData = UBound(baCertStore) + 1
+    If CryptQueryObject(CERT_QUERY_OBJECT_BLOB, uBlob, CERT_QUERY_CONTENT_FLAG_ALL, CERT_QUERY_FORMAT_FLAG_BINARY, 0, 0, 0, 0, hPkcs7Store, hCryptMsg, 0) <> 0 Then
+        Do
+            pCertContext = CertEnumCertificatesInStore(hPkcs7Store, pCertContext)
+            If pCertContext = 0 Then
+                Exit Do
+            End If
+            pvPkiAppendCertContext pCertContext, cCerts, cPrivKey
+            '--- success
+            pvPkiPemImportPkcs7CertStore = True
+        Loop
+    End If
+QH:
+    If hPkcs7Store <> 0 Then
+        Call CertCloseStore(hPkcs7Store, 0)
+    End If
+    If hCryptMsg <> 0 Then
+        Call CryptMsgClose(hCryptMsg)
+    End If
+    If IsArray(vErr) Then
+        ErrRaise vErr(0), vErr(1), vErr(2)
+    End If
+    Exit Function
+EH:
+    vErr = Array(Err.Number, Err.Source, Err.Description)
+    PrintError FUNC_NAME
+    Resume QH
 End Function
 #End If
 

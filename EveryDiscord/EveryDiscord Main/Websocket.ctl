@@ -87,7 +87,14 @@ Option Explicit
 
 'the version of the protocol this websocket supports
 Private Const PROTOCOL_VERSION As String = "13"
-
+Private Enum UcsTlsLocalFeaturesEnum '--- bitmask
+    ucsTlsSupportTls10 = 2 ^ 0
+    ucsTlsSupportTls11 = 2 ^ 1
+    ucsTlsSupportTls12 = 2 ^ 2
+    ucsTlsSupportTls13 = 2 ^ 3
+    ucsTlsIgnoreServerCertificateErrors = 2 ^ 4
+    ucsTlsSupportAll = ucsTlsSupportTls10 Or ucsTlsSupportTls11 Or ucsTlsSupportTls12 Or ucsTlsSupportTls13
+End Enum
 
 
 '===================================
@@ -212,7 +219,6 @@ Private Sub UserControl_Initialize()
 
     'this is needed to init the crypto subsystem for sha1 and sha256
     Set TlsSock = New cTlsSocket
-
     Set Compressor = New cZipArchive
 
 End Sub
@@ -311,7 +317,7 @@ Public Sub Connect(ByVal URI As String, Optional ByVal Port As String, Optional 
     'create a new instance (cTlsSocket doesnt seem to support re-use (or maybe im just dumb))
     Set TlsSock = New cTlsSocket
 
-    If Not TlsSock.Connect(ServerAddress, ServerPort, ServerScheme, ucsTlsSupportAll) Then
+    If Not TlsSock.Connect(ServerAddress, ServerPort, ServerScheme, ucsTlsSupportAll Or ucsTlsIgnoreServerCertificateErrors) Then
         RaiseEvent OnError(InternalError, "Unable to connect.")
         GoTo Connect_Error
     End If
@@ -970,34 +976,34 @@ End Sub
 
 'processing of http data and websocket frames is now seperate
 'this function assumes we are in a connecting state
-Private Sub ProcessHTTPData(ByVal Buff As String)
+Private Sub ProcessHTTPData(ByVal buff As String)
 
     Dim FirstLine As String
     Dim Pos As Long
     Dim HttpCode As Long
     Dim URI As String
 
-    Pos = InStr(Buff, vbCrLf)
+    Pos = InStr(buff, vbCrLf)
     If Pos Then
-        FirstLine = Left$(Buff, Pos - 1)
+        FirstLine = Left$(buff, Pos - 1)
         If Len(FirstLine) Then
             If (UCase$(FirstLine) Like "HTTP/1.# ### *") Then
 
-                Pos = InStr(Buff, " ")
-                HttpCode = CLng(Trim$(Mid$(Buff, Pos + 1, 3)))
+                Pos = InStr(buff, " ")
+                HttpCode = CLng(Trim$(Mid$(buff, Pos + 1, 3)))
 
                 Select Case HttpCode
 
                     Case 101    'switching protocols
 
                         'the protocol specs require these checks
-                        If StrComp(getHeaderValue(Buff, "upgrade"), "websocket", vbTextCompare) <> 0 Then
+                        If StrComp(getHeaderValue(buff, "upgrade"), "websocket", vbTextCompare) <> 0 Then
                             ConnectionState = STATE_CLOSING
                             RaiseEvent OnError(ProtocolError, "Invalid handshake recieved. Upgrade header not present.")
                             ForceShutdown
                             Exit Sub
                         End If
-                        If StrComp(getHeaderValue(Buff, "connection"), "upgrade", vbTextCompare) <> 0 Then
+                        If StrComp(getHeaderValue(buff, "connection"), "upgrade", vbTextCompare) <> 0 Then
                             ConnectionState = STATE_CLOSING
                             RaiseEvent OnError(ProtocolError, "Invalid handshake recieved. Connection header not present.")
                             ForceShutdown
@@ -1005,7 +1011,7 @@ Private Sub ProcessHTTPData(ByVal Buff As String)
                         End If
 
                         'here we validate the server, to be authentic
-                        If MakeAcceptKey(ClientSecret_Enc) <> getHeaderValue(Buff, "Sec-Websocket-Accept:") Then
+                        If MakeAcceptKey(ClientSecret_Enc) <> getHeaderValue(buff, "Sec-Websocket-Accept:") Then
                             ConnectionState = STATE_CLOSING
                             RaiseEvent OnError(ProtocolError, "The client-server secret key challenge failed.")
                             ForceShutdown
@@ -1013,10 +1019,10 @@ Private Sub ProcessHTTPData(ByVal Buff As String)
                         End If
 
                         'set the server accepted protocols and extensions
-                        ServerProtocols = FormatProtocols(getHeaderValue(Buff, "Sec-WebSocket-Protocol:"))
+                        ServerProtocols = FormatProtocols(getHeaderValue(buff, "Sec-WebSocket-Protocol:"))
 
                         'extensions are the same format as protocols
-                        ServerExtensions = FormatProtocols(getHeaderValue(Buff, "Sec-WebSocket-Extensions:"))
+                        ServerExtensions = FormatProtocols(getHeaderValue(buff, "Sec-WebSocket-Extensions:"))
 
                         If Use_Compression Then
                             'todo: negotiate compression options
@@ -1034,7 +1040,7 @@ Private Sub ProcessHTTPData(ByVal Buff As String)
                     Case 301, 302, 303, 307, 308    'moved/redirect
 
                         'we make a weak attempt to support redirection
-                        URI = getHeaderValue(Buff, "Location:")
+                        URI = getHeaderValue(buff, "Location:")
                         If Len(URI) > 8 Then
                             If StrComp(Left$(URI, 5), "https", vbTextCompare) Then
                                 'secure socket
@@ -1325,31 +1331,31 @@ End Sub
 ' socket error
 Private Sub TlsSock_OnError(ByVal ErrorCode As Long, ByVal EventMask As UcsAsyncSocketEventMaskEnum)
 
-    Dim S As String, E As String
+    Dim s As String, E As String
 
     If EventMask = ucsSfdAccept Then
-        S = "Event Type: Accept"
+        s = "Event Type: Accept"
     ElseIf EventMask = ucsSfdAll Then
-        S = "Event Type: Unknown/All"
+        s = "Event Type: Unknown/All"
     ElseIf EventMask = ucsSfdClose Then
-        S = "Event Type: Close"
+        s = "Event Type: Close"
     ElseIf EventMask = ucsSfdConnect Then
-        S = "Event Type: Connect"
+        s = "Event Type: Connect"
     ElseIf EventMask = ucsSfdOob Then
-        S = "Event Type: OOB Out-Of-Band"
+        s = "Event Type: OOB Out-Of-Band"
     ElseIf EventMask = ucsSfdRead Then
-        S = "Event Type: Recieve/Read"
+        s = "Event Type: Recieve/Read"
     ElseIf EventMask = ucsSfdWrite Then
-        S = "Event Type: Send/Write"
+        s = "Event Type: Send/Write"
     Else
-        S = "Event Type: Unknown (" & CStr(EventMask) & ")"
+        s = "Event Type: Unknown (" & CStr(EventMask) & ")"
     End If
 
     E = TlsSock.GetErrorDescription(ErrorCode)
-    S = S & " " & CStr(ErrorCode) & ":  Description: " & E
+    s = s & " " & CStr(ErrorCode) & ":  Description: " & E
 
     ConnectionState = STATE_CLOSING
-    RaiseEvent OnError(WinSockError, S)
+    RaiseEvent OnError(WinSockError, s)
     If Not TlsSock.IsClosed Then
         Disconnect
     Else
@@ -1363,7 +1369,7 @@ End Sub
 'raw incoming data starts here, all available winsock data is put into a FIFO buffer
 'then processed by the InspectBuffer() function.
 Private Sub TlsSock_OnReceive()
-    Dim Buff() As Byte
+    Dim buff() As Byte
     Dim BuffLen As Long
     Dim T As Long
 
@@ -1371,10 +1377,10 @@ Private Sub TlsSock_OnReceive()
     T = timeGetTime
 
     Do While (TlsSock.AvailableBytes > 0)
-        If TlsSock.ReceiveArray(Buff) Then
+        If TlsSock.ReceiveArray(buff) Then
 
             'add to byte buffer
-            BuffLen = UBound(Buff) + 1
+            BuffLen = UBound(buff) + 1
 
             'this prevents conflicts with the buffer resizing function
             Do While TrimmingData
@@ -1388,7 +1394,7 @@ Private Sub TlsSock_OnReceive()
                     ReDim .B(BuffLen - 1) As Byte
                 End If
                 'copy temp buffer to end of primary buffer
-                CopyMemory .B(.Count), Buff(0), BuffLen
+                CopyMemory .B(.Count), buff(0), BuffLen
                 .Count = .Count + BuffLen
             End With
             BuffLen = 0
@@ -1427,7 +1433,7 @@ End Sub
 Private Sub InspectBuffer()
     Dim Bytes() As Byte    'temp buffer
     Dim PacketLen As Long
-    Dim Buff As String
+    Dim buff As String
     Dim BuffLen As Long
     Dim ContentLen As Long
     Dim HeaderEnd As Long
@@ -1446,32 +1452,32 @@ Private Sub InspectBuffer()
             'this complicated code is needed...
 
             'convert to string to make parsing easier
-            Buff = StrConv(.B, vbUnicode)
+            buff = StrConv(.B, vbUnicode)
 
-            If Len(Buff) < 12 Then
+            If Len(buff) < 12 Then
                 RaiseEvent OnError(InvalidData, "Cannot connect! Incoming Header Data Corrupted. Please try again.")
                 ForceShutdown
                 Exit Sub
             End If
 
             'first do a simple check
-            If (Right$(Buff, 4) = vbCrLf & vbCrLf) Or (Right$(Buff, 2) = vbLf & vbLf) Then    'all good
+            If (Right$(buff, 4) = vbCrLf & vbCrLf) Or (Right$(buff, 2) = vbLf & vbLf) Then    'all good
                 Erase .B
                 .Count = 0
-                ProcessHTTPData Buff
+                ProcessHTTPData buff
                 Exit Sub
             End If
 
             'check for a content length
-            ContentLen = StrToNum(getHeaderValue(Buff, "Content-Length"))
+            ContentLen = StrToNum(getHeaderValue(buff, "Content-Length"))
 
             'get the header length
-            HeaderEnd = InStr(Buff, vbCrLf & vbCrLf)
+            HeaderEnd = InStr(buff, vbCrLf & vbCrLf)
             If HeaderEnd Then
                 HeaderEnd = HeaderEnd + 3
             Else
                 'look for unix line endings
-                HeaderEnd = InStr(Buff, vbLf & vbLf)
+                HeaderEnd = InStr(buff, vbLf & vbLf)
                 If HeaderEnd Then
                     HeaderEnd = HeaderEnd + 1
                 Else
@@ -1484,9 +1490,9 @@ Private Sub InspectBuffer()
 
             'get the header and any content
             BuffLen = HeaderEnd + ContentLen
-            HttpBuff = Left$(Buff, BuffLen)
+            HttpBuff = Left$(buff, BuffLen)
 
-            If (Len(Buff) - BuffLen) > 0 Then
+            If (Len(buff) - BuffLen) > 0 Then
                 'we have to convert back to byte array to know the proper length to strip away
                 'because conversion can cause different lengths
                 Bytes = StrConv(HttpBuff, vbFromUnicode)
@@ -1777,7 +1783,7 @@ End Function
 'get a text representation of a websocket status code
 'this function is accessible from the usercontrol
 Public Function GetStatusCodeText(ByVal statcode As WebsocketStatus) As String
-    Dim S As String
+    Dim s As String
 
     If statcode = AbNormalClosure Then
         GetStatusCodeText = "Abnormal Closure or connection closed unexpectedly."
@@ -1814,9 +1820,9 @@ Public Function GetStatusCodeText(ByVal statcode As WebsocketStatus) As String
     ElseIf statcode = WinSockError Then
         GetStatusCodeText = "Winsock Socket Error."
     Else
-        S = TlsSock.GetErrorDescription(statcode)
-        If Len(S) Then
-            GetStatusCodeText = S
+        s = TlsSock.GetErrorDescription(statcode)
+        If Len(s) Then
+            GetStatusCodeText = s
         Else
             Select Case statcode
                 Case 0 To 999, 1016 To 1999
