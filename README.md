@@ -1,3 +1,4 @@
+![image](https://github.com/user-attachments/assets/b3d5481f-5e75-4626-bd70-f636d41a54d5)
 # EveryDiscord - Legacy Windows Discord Client
 
 A simple, fast, and reliable native Discord client for legacy Windows versions, including Windows XP.
