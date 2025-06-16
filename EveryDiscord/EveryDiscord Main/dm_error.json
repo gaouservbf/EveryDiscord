@@ -1,18 +1,1 @@
-P/1.1 200 OK
-Date: Fri, 13 Jun 2025 19:55:10 GMT
-Content-Type: application/json
-Transfer-Encoding: chunked
-Connection: close
-Set-Cookie: __dcfduid=4ffc8d24489011f08a6526300811c257; Expires=Wed, 12-Jun-2030 19:55:10 GMT; Max-Age=157680000; Secure; HttpOnly; Path=/; SameSite=Lax
-strict-transport-security: max-age=31536000; includeSubDomains; preload
-x-discord-features: chat
-vary: Accept-Encoding
-via: 1.1 google
-alt-svc: h3=":443"; ma=86400
-CF-Cache-Status: BYPASS
-Report-To: {"endpoints":[{"url":"https:\/\/a.nel.cloudflare.com\/report\/v4?s=d9pA0a0iQdKFUpmlm2ZvecjbOGkihdyGbOmPtEG%2BuAWrESdnZXGY9iaZ998y8Hb9QX%2BbwVf2P3pIpOyCDdO%2Bm2WVp9VDYqrIDQFdy9n8xOXdB5GoTQgGdZJC8sDk"}],"group":"cf-nel","max_age":604800}
-NEL: {"success_fraction":0,"report_to":"cf-nel","max_age":604800}
-X-Content-Type-Options: nosniff
-Reporting-Endpoints: csp-sentry="https://o64374.ingest.sentry.io/api/5441894/security/?sentry_key=8fbbce30bf5244ec9429546beef21870&sentry_environment=stable"
-Content-Security-Policy: frame-ancestors 'none'; default-src https://o64374.ingest.sentry.io; report-to csp-sentry; report-uri https://o64374.ingest.sentry.io/api/5441894/security/?sentry_key=8fbbce30bf5244ec9429546beef21870&sentry_environment=stable
-Set-Cookie: __sdcfduid=4ffc8d24489011f08a6526300811c257b571d93525a64de6a2958c38baaba61f1c7ba348e9ee79b786a3692f269fab35; Expires=
+

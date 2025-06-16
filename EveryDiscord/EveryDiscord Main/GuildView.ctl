@@ -61,7 +61,7 @@ End Sub
 
 ' Update a guild's icon
 Public Sub UpdateGuildIcon(ByVal Index As Long, icon As StdPicture)
-MsgBox "hm"
+
     If Index >= 0 And Index < GuildCount Then
         Set Guilds(Index).icon = icon
         UserControl.Refresh

@@ -32,7 +32,7 @@ Attribute VB_Creatable = True
 Attribute VB_PredeclaredId = False
 Attribute VB_Exposed = False
 Private Type ChatMessage
-    Username As String
+    UserName As String
     Text As String
     Avatar As StdPicture ' optional
     RenderedHeight As Long ' cached height after word wrapping
@@ -62,7 +62,7 @@ Private Sub UserControl_Initialize()
     AutoScrollEnabled = True
 End Sub
 
-Public Sub AddMessage(ByVal Username As String, ByVal Texts As String, Optional Avatar As StdPicture)
+Public Sub AddMessage(ByVal UserName As String, ByVal Texts As String, Optional Avatar As StdPicture)
     ' Check if we should autoscroll (only if user is at or near bottom)
     Dim ShouldAutoScroll As Boolean
     ShouldAutoScroll = AutoScrollEnabled And (vsbChat.Value >= vsbChat.Max - (BaseLineHeight * 2))
@@ -72,7 +72,7 @@ Public Sub AddMessage(ByVal Username As String, ByVal Texts As String, Optional 
     Dim i As Integer
     For i = 0 To UBound(Text) Step 1
         ReDim Preserve Messages(MessageCount)
-        Messages(MessageCount).Username = Username
+        Messages(MessageCount).UserName = UserName
         Messages(MessageCount).Text = Text(i)
         Set Messages(MessageCount).Avatar = Avatar
         Messages(MessageCount).RenderedHeight = 0 ' Will be calculated during render
@@ -563,7 +563,7 @@ Private Sub DrawParsedLine(ByVal Line As Collection, ByVal StartX As Long, ByVal
         Select Case ElementType
             Case "text"
                 UserControl.CurrentX = CurrentX
-                UserControl.CurrentY = Y
+                UserControl.CurrentY = Y - 2
                 UserControl.ForeColor = vbBlack
                 UserControl.FontBold = False
                 UserControl.Print Content;
@@ -571,7 +571,7 @@ Private Sub DrawParsedLine(ByVal Line As Collection, ByVal StartX As Long, ByVal
                 
             Case "bold"
                 UserControl.CurrentX = CurrentX
-                UserControl.CurrentY = Y
+                UserControl.CurrentY = Y - 2
                 UserControl.ForeColor = vbBlack
                 UserControl.FontBold = True
                 UserControl.Print Content;
@@ -580,7 +580,7 @@ Private Sub DrawParsedLine(ByVal Line As Collection, ByVal StartX As Long, ByVal
                 
             Case "italic"
                 UserControl.CurrentX = CurrentX
-                UserControl.CurrentY = Y
+                UserControl.CurrentY = Y - 4
                 UserControl.ForeColor = vbBlack
                 UserControl.FontItalic = True
                 UserControl.Print Content;
@@ -589,14 +589,14 @@ Private Sub DrawParsedLine(ByVal Line As Collection, ByVal StartX As Long, ByVal
                 
             Case "quote"
                 UserControl.CurrentX = CurrentX
-                UserControl.CurrentY = Y
+                UserControl.CurrentY = Y - 2
                 UserControl.ForeColor = &H808080
                 UserControl.Print "> " & Content;
                 CurrentX = UserControl.CurrentX
                 
             Case "h1"
                 UserControl.CurrentX = CurrentX
-                UserControl.CurrentY = Y
+                UserControl.CurrentY = Y - 2
                 UserControl.ForeColor = vbBlack
                 UserControl.FontBold = True
                 UserControl.FontSize = UserControl.FontSize + 4
@@ -607,7 +607,7 @@ Private Sub DrawParsedLine(ByVal Line As Collection, ByVal StartX As Long, ByVal
                 
             Case "h2"
                 UserControl.CurrentX = CurrentX
-                UserControl.CurrentY = Y
+                UserControl.CurrentY = Y - 2
                 UserControl.ForeColor = vbBlack
                 UserControl.FontBold = True
                 UserControl.FontSize = UserControl.FontSize + 2
@@ -618,7 +618,7 @@ Private Sub DrawParsedLine(ByVal Line As Collection, ByVal StartX As Long, ByVal
                 
             Case "h3"
                 UserControl.CurrentX = CurrentX
-                UserControl.CurrentY = Y
+                UserControl.CurrentY = Y - 2
                 UserControl.ForeColor = vbBlack
                 UserControl.FontBold = True
                 UserControl.Print Content;
@@ -627,7 +627,7 @@ Private Sub DrawParsedLine(ByVal Line As Collection, ByVal StartX As Long, ByVal
                 
             Case "small"
                 UserControl.CurrentX = CurrentX
-                UserControl.CurrentY = Y
+                UserControl.CurrentY = Y - 2
                 UserControl.ForeColor = vbBlack
                 UserControl.FontSize = UserControl.FontSize - 2
                 UserControl.Print Content;
@@ -636,7 +636,7 @@ Private Sub DrawParsedLine(ByVal Line As Collection, ByVal StartX As Long, ByVal
                 
             Case "bullet"
                 UserControl.CurrentX = CurrentX
-                UserControl.CurrentY = Y
+                UserControl.CurrentY = Y - 2
                 UserControl.ForeColor = vbBlack
                 UserControl.Print "• " & Content;
                 CurrentX = UserControl.CurrentX
@@ -650,7 +650,7 @@ Private Sub DrawParsedLine(ByVal Line As Collection, ByVal StartX As Long, ByVal
                 Else
                     ' Fallback to text if emoji not found
                     UserControl.CurrentX = CurrentX
-                    UserControl.CurrentY = Y
+                UserControl.CurrentY = Y - 2
                     UserControl.ForeColor = vbBlack
                     UserControl.Print ":" & Content & ":";
                     CurrentX = UserControl.CurrentX
@@ -669,7 +669,7 @@ Private Sub DrawParsedLine(ByVal Line As Collection, ByVal StartX As Long, ByVal
                 
                 ' Draw text with system highlight text color
                 UserControl.CurrentX = CurrentX
-                UserControl.CurrentY = Y
+                UserControl.CurrentY = Y - 2
                 UserControl.ForeColor = &H8000000E
                 UserControl.FontBold = True
                 UserControl.Print PingText;
@@ -733,7 +733,7 @@ Private Sub UserControl_Paint()
     Dim Margin As Long: Margin = 8
     
     UserControl.Cls
-    CurrentY = -TopIndex + Margin
+    CurrentY = -TopIndex + Margin - 8
     
     For i = 0 To MessageCount - 1
         If Messages(i).RenderedHeight = 0 Then
@@ -753,7 +753,7 @@ Private Sub UserControl_Paint()
             UserControl.CurrentY = CurrentY
             UserControl.ForeColor = vbBlack
             UserControl.FontBold = True
-            UserControl.Print Messages(i).Username
+            UserControl.Print Messages(i).UserName
             
             ' Draw wrapped message text with markdown
             UserControl.FontBold = False

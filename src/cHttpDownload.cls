@@ -241,8 +241,11 @@ Private Sub pvInit(Url As String, LocalFileName As Variant, ByVal StreamFlags As
         On Error GoTo 0
         Err.Raise vbObjectError, , m_oSocket.GetErrorDescription(m_oSocket.LastError)
     End If
-    If Not m_oSocket.Connect(m_uRemote.Host, m_uRemote.Port, True, ucsTlsIgnoreServerCertificateErrors Or ucsTlsSupportAll) Then
-
+    #If ImplUseTls Then
+    If Not m_oSocket.Connect(m_uRemote.Host, m_uRemote.Port, pvIsProtocolSecure(m_uRemote.Protocol), ucsTlsIgnoreServerCertificateErrors Or ucsTlsSupportAll) Then
+    #Else
+    If Not m_oSocket.Connect(m_uRemote.Host, m_uRemote.Port) Then
+    #End If
         On Error GoTo 0
         Err.Raise vbObjectError, , m_oSocket.GetErrorDescription(m_oSocket.LastError)
     End If
@@ -721,5 +724,3 @@ End Sub
 Private Sub Class_Terminate()
     Set m_oSocket = Nothing
 End Sub
-
-

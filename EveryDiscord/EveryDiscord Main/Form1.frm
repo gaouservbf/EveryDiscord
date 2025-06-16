@@ -9,14 +9,15 @@ Begin VB.Form Form1
    ClientWidth     =   10215
    Icon            =   "Form1.frx":0000
    LinkTopic       =   "Form1"
-   ScaleHeight     =   8370
-   ScaleWidth      =   10215
+   ScaleHeight     =   558
+   ScaleMode       =   3  'Pixel
+   ScaleWidth      =   681
    StartUpPosition =   3  'Windows Default
    Begin VB.CommandButton Emojiz 
       Height          =   435
       Left            =   9765
       Style           =   1  'Graphical
-      TabIndex        =   14
+      TabIndex        =   13
       Top             =   7560
       Width           =   435
    End
@@ -33,7 +34,7 @@ Begin VB.Form Form1
       Left            =   1320
       ScaleHeight     =   495
       ScaleWidth      =   8790
-      TabIndex        =   11
+      TabIndex        =   10
       Top             =   0
       Width           =   8790
       Begin VB.Label lblChannel 
@@ -51,7 +52,7 @@ Begin VB.Form Form1
          ForeColor       =   &H8000000E&
          Height          =   210
          Left            =   2520
-         TabIndex        =   13
+         TabIndex        =   12
          Top             =   210
          Width           =   6270
       End
@@ -71,7 +72,7 @@ Begin VB.Form Form1
          ForeColor       =   &H8000000E&
          Height          =   270
          Left            =   0
-         TabIndex        =   12
+         TabIndex        =   11
          Top             =   210
          Width           =   2175
       End
@@ -89,7 +90,7 @@ Begin VB.Form Form1
       EndProperty
       Height          =   435
       Left            =   2520
-      TabIndex        =   9
+      TabIndex        =   8
       Top             =   7560
       Width           =   435
    End
@@ -172,20 +173,16 @@ Begin VB.Form Form1
          EndProperty
          Height          =   330
          Left            =   1560
-         TabIndex        =   10
+         TabIndex        =   9
          Top             =   630
          Width           =   855
       End
-      Begin VB.PictureBox Picture2 
-         BackColor       =   &H8000000C&
-         BorderStyle     =   0  'None
-         Height          =   555
-         Left            =   525
-         ScaleHeight     =   555
-         ScaleWidth      =   555
-         TabIndex        =   8
-         Top             =   210
-         Width           =   555
+      Begin VB.Image upfp 
+         Height          =   615
+         Left            =   480
+         Stretch         =   -1  'True
+         Top             =   240
+         Width           =   615
       End
       Begin VB.Label Label2 
          Caption         =   "Status"
@@ -330,7 +327,7 @@ Begin VB.Form Form1
       Align           =   2  'Align Bottom
       Height          =   375
       Left            =   0
-      TabIndex        =   15
+      TabIndex        =   14
       Top             =   7995
       Width           =   10215
       _ExtentX        =   18018
@@ -360,7 +357,7 @@ Begin VB.Form Form1
    Begin ComctlLib.TreeView lstChannel 
       Height          =   6495
       Left            =   1320
-      TabIndex        =   16
+      TabIndex        =   15
       Top             =   480
       Width           =   2175
       _ExtentX        =   3836
@@ -399,12 +396,34 @@ Private Const MODULE_NAME = "Form1"
 
 #Const ImplUseDebugLog = (USE_DEBUG_LOG <> 0)
 
+Private WithEvents m_oSocket As cTlsSocket
+Attribute m_oSocket.VB_VarHelpID = -1
+Private WithEvents m_oHttpDownload As cHttpDownload
+Attribute m_oHttpDownload.VB_VarHelpID = -1
+
+Private m_dblStartTimerEx As Double
+Private m_dblNextTimerEx As Double
+Attribute m_dblNextTimerEx.VB_VarHelpID = -1
+Private WithEvents m_oRequest As cHttpRequest
+Attribute m_oRequest.VB_VarHelpID = -1
+Private m_oRootCa As cTlsSocket
+
+Private Type UcsParsedUrl
+    Protocol        As String
+    Host            As String
+    Port            As Long
+    Path            As String
+    QueryString     As String
+    Anchor          As String
+    User            As String
+    Pass            As String
+End Type
+
 Private Const DISCORD_GATEWAY_URL As String = "wss://gateway.discord.gg/?v=10&encoding=json"
 Private Const DISCORD_GATEWAY_VERSION As String = "10"
 Private Const DISCORD_GATEWAY_PORT As Long = 443
 
-Private WithEvents m_oHttpDownload As cHttpDownload
-Attribute m_oHttpDownload.VB_VarHelpID = -1
+
 Private m_lFreeSocketIndex As Long     ' Next available socket index
 
 Private m_bGatewayReady As Boolean
@@ -761,16 +780,15 @@ Form4.Show
 End Sub
 
 Private Sub Form_Resize()
-On Error Resume Next
     ChatView1.Width = Me.ScaleWidth - GuildView1.Width - lstChannel.Width
     GuildView1.Height = Me.ScaleHeight - Picture1.Height - StatusBar1.Height
       lstChannel.Height = Me.ScaleHeight - Picture1.Height - StatusBar1.Height - lstChannel.Top
     Picture3.Width = Me.ScaleWidth - Picture3.Left
     Picture1.Top = Me.ScaleHeight - Picture1.Height - StatusBar1.Height
-    Emojiz.Top = Me.ScaleHeight - 810
-    txtMsg.Top = Me.ScaleHeight - 810
-    btnUpload.Top = Me.ScaleHeight - 810
-    ChatView1.Height = Me.ScaleHeight - 1350
+    Emojiz.Top = Me.ScaleHeight - 810 / Screen.TwipsPerPixelY
+    txtMsg.Top = Me.ScaleHeight - 810 / Screen.TwipsPerPixelY
+    btnUpload.Top = Me.ScaleHeight - 810 / Screen.TwipsPerPixelY
+    ChatView1.Height = Me.ScaleHeight - 1350 / Screen.TwipsPerPixelY
     Emojiz.Left = Me.ScaleWidth - Emojiz.Width
     txtMsg.Width = Me.ScaleWidth - txtMsg.Left - Emojiz.Width
 End Sub
@@ -799,6 +817,7 @@ DoEvents
     End If
     End If
 End Sub
+
 
 
 Private Sub Timer1_Timer()
@@ -1093,8 +1112,155 @@ DoEvents
 End Sub
 
 Private Sub FetchGuildIcon(ByVal sGuildId As String, ByVal sIconHash As String, ByVal guildIndex As Long)
-   
+    Const FUNC_NAME As String = "FetchGuildIcon"
+    On Error GoTo EH
+    
+    Dim sUrl As String
+    Dim sTempPath As String
+    Dim sFileName As String
+    Dim sContentType As String
+    Dim sExtension As String
+    Dim vResponseBody() As Byte
+    Dim iFileNum As Integer
+    
+    ' Determine if icon is animated (starts with "a_")
+    Dim isAnimated As Boolean
+    isAnimated = (Left$(sIconHash, 2) = "a_")
+    
+    ' Build the appropriate URL
+    If isAnimated Then
+        sUrl = "https://cdn.discordapp.com/icons/" & sGuildId & "/" & sIconHash & ".gif?size=128"
+    Else
+        sUrl = "https://cdn.discordapp.com/icons/" & sGuildId & "/" & sIconHash & ".jpg?size=128"
+    End If
+    
+    ' Initialize HTTP request
+    If m_oRequest Is Nothing Then
+        Set m_oRequest = New cHttpRequest
+    End If
+    
+    ' Configure request
+    m_oRequest.Option_(WinHttpRequestOption_SslErrorIgnoreFlags) = SslErrorFlag_Ignore_All
+    m_oRequest.SetTimeouts 5000, 5000, 5000, 5000
+    m_oRequest.Option_(WinHttpRequestOption_EnableHttpsToHttpRedirects) = True
+    m_oRequest.Open_ "GET", sUrl
+    m_oRequest.SetRequestHeader "User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4638.69 Safari/537.36"
+    
+    ' Send request
+    m_oRequest.Send
+    
+    ' Check for successful response
+    If m_oRequest.Status <> 200 Then
+        Debug.Print "Failed to download guild icon. Status: " & m_oRequest.Status
+        Exit Sub
+    End If
+    
+    ' Generate filename in temp folder
+    sTempPath = Environ("TEMP")
+    If isAnimated Then
+        sFileName = sTempPath & "\Discord_GuildIcon_" & sGuildId & ".gif"
+    Else
+        sFileName = sTempPath & "\Discord_GuildIcon_" & sGuildId & ".jpg"
+    End If
+    
+    ' Save binary data to file
+    vResponseBody = m_oRequest.ResponseBody
+    iFileNum = FreeFile
+    Open sFileName For Binary Access Write As #iFileNum
+    Put #iFileNum, , vResponseBody
+    Close #iFileNum
+    
+    ' Load the image
+    Dim img As StdPicture
+    Set img = LoadPicture(sFileName)
+   ' Picture2.Picture = img
+    ' Update the guild icon in the UI
+    GuildView1.UpdateGuildIcon guildIndex, img
+    
+    ' Clean up temp file
+    Kill sFileName
+    
+    Exit Sub
+EH:
+    Debug.Print "Error in " & FUNC_NAME & ": " & Err.Description
 End Sub
+
+Public Function FetchUserAvatar(ByVal sUserId As String, ByVal sAvatarHash As String) As StdPicture
+    Const FUNC_NAME As String = "FetchUserAvatar"
+    On Error GoTo EH
+    
+    ' Check if we have a valid avatar hash
+    If Len(sAvatarHash) = 0 Then
+        ' Return default avatar
+        Set FetchUserAvatar = LoadPicture() ' Empty picture
+        Exit Function
+    End If
+    
+    Dim sUrl As String
+    Dim sTempPath As String
+    Dim sFileName As String
+    Dim vResponseBody() As Byte
+    Dim iFileNum As Integer
+    
+    ' Determine if avatar is animated (starts with "a_")
+    Dim isAnimated As Boolean
+    isAnimated = (Left$(sAvatarHash, 2) = "a_")
+    
+    ' Build the appropriate URL
+    If isAnimated Then
+        sUrl = "https://cdn.discordapp.com/avatars/" & sUserId & "/" & sAvatarHash & ".gif?size=128"
+    Else
+        sUrl = "https://cdn.discordapp.com/avatars/" & sUserId & "/" & sAvatarHash & ".jpg?size=128"
+    End If
+    
+    ' Initialize HTTP request
+    If m_oRequest Is Nothing Then
+        Set m_oRequest = New cHttpRequest
+    End If
+    
+    ' Configure request
+    m_oRequest.Option_(WinHttpRequestOption_SslErrorIgnoreFlags) = SslErrorFlag_Ignore_All
+    m_oRequest.SetTimeouts 5000, 5000, 5000, 5000
+    m_oRequest.Option_(WinHttpRequestOption_EnableHttpsToHttpRedirects) = True
+    m_oRequest.Open_ "GET", sUrl
+    m_oRequest.SetRequestHeader "User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4638.69 Safari/537.36"
+    
+    ' Send request
+    m_oRequest.Send
+    
+    ' Check for successful response
+    If m_oRequest.Status <> 200 Then
+        Debug.Print "Failed to download user avatar. Status: " & m_oRequest.Status
+        Set FetchUserAvatar = LoadPicture() ' Return empty picture on failure
+        Exit Function
+    End If
+    
+    ' Generate filename in temp folder
+    sTempPath = Environ("TEMP")
+    If isAnimated Then
+        sFileName = sTempPath & "\Discord_Avatar_" & sUserId & ".gif"
+    Else
+        sFileName = sTempPath & "\Discord_Avatar_" & sUserId & ".jpg"
+    End If
+    
+    ' Save binary data to file
+    vResponseBody = m_oRequest.ResponseBody
+    iFileNum = FreeFile
+    Open sFileName For Binary Access Write As #iFileNum
+    Put #iFileNum, , vResponseBody
+    Close #iFileNum
+    
+    ' Load the image and return it
+    Set FetchUserAvatar = LoadPicture(sFileName)
+    
+    ' Clean up temp file
+    Kill sFileName
+    
+    Exit Function
+EH:
+    Debug.Print "Error in " & FUNC_NAME & ": " & Err.Description
+    Set FetchUserAvatar = LoadPicture() ' Return empty picture on error
+End Function
 Private Sub ProcessGuildsResponse(aJson As String)
     Dim parsed As ParseResult
     Dim i As Long
@@ -1129,7 +1295,6 @@ Private Sub ProcessGuildsResponse(aJson As String)
     Next i
     DoEvents
     ' Resize the array to match guild count
-
     ReDim m_GuildIds(0 To GuildCount - 1) As String
     
     DoEvents
@@ -1139,7 +1304,6 @@ Private Sub ProcessGuildsResponse(aJson As String)
     
     DoEvents
     For i = 1 To parsed.Value.Count
-        On Error Resume Next
         Dim Guild As Object
         Set Guild = parsed.Value(i)
         
@@ -1156,9 +1320,8 @@ Private Sub ProcessGuildsResponse(aJson As String)
         
         sGuildName = Guild("name")
         sGuildId = Guild("id")
-        
-        ' Get icon if available
         On Error Resume Next
+        ' Get icon if available
         sIconHash = Guild("icon")
         On Error GoTo 0
         
@@ -1166,24 +1329,23 @@ Private Sub ProcessGuildsResponse(aJson As String)
         Set guildIcon = LoadPicture() ' Default empty icon
         
     DoEvents
+        GuildView1.AddGuild sGuildName, guildIcon
+        m_GuildIds(validGuilds) = sGuildId
         ' If icon hash exists, fetch it
         If Len(sIconHash) > 0 Then ' Replace QueueGuildIconFetch calls with:
         
-    DoEvents
 FetchGuildIcon sGuildId, sIconHash, i
         End If
         
-        GuildView1.AddGuild sGuildName, guildIcon
         
         ' Store ID in parallel array
-        m_GuildIds(validGuilds) = sGuildId
         
        
         
         validGuilds = validGuilds + 1
         
         ' Debug output
-        Debug.Print "Added guild: " & sGuildName & " with ID: " & sGuildId
+      '  Debug.Print "Added guild: " & sGuildName & " with ID: " & sGuildId
     Next i
 End Sub
 Private Sub ProcessChannelsResponse(aJson As String)
@@ -1510,28 +1672,24 @@ Private Sub lstChannel_Click()
 End Sub
 
 Private Sub ProcessMessagesResponse(aJson As String)
-'On Error Resume Next
+    On Error Resume Next
     Dim parsed As ParseResult
     Dim i As Long
     Dim sOutput As String
-    Dim fileNum As Integer
-    Dim desktopPath As String
-    Dim filePath As String
     Dim sjson As String
-'    sjson = Left$(aJson, Len(aJson) - 5)
-    ' Parse the JSON array
+    
     sjson = aJson
     parsed = Parse(sjson)
  
     If Not parsed.IsValid Then
-       ' Exit Sub
+        Exit Sub
     End If
     
     ' Clear existing messages
     ChatView1.Clear
+    
     ' Process each message
     For i = 20 To 1 Step -1
-    On Error Resume Next
         Dim Msg As Object
         Set Msg = parsed.Value(i)
         
@@ -1539,20 +1697,29 @@ Private Sub ProcessMessagesResponse(aJson As String)
         Dim sAuthor As String
         Dim sContent As String
         Dim sTimestamp As String
+        Dim sUserId As String
+        Dim sAvatarHash As String
+        Dim avatarPic As StdPicture
         
         On Error Resume Next ' Handle potential missing fields
         sAuthor = Msg("author")("global_name")
         sContent = Msg("content")
         sTimestamp = FormatDiscordTimestamp(Msg("timestamp"))
+        sUserId = Msg("author")("id")
+        sAvatarHash = Msg("author")("avatar")
+        On Error GoTo 0
         
-        ' Format the output
-        sOutput = "[" & sTimestamp & "] " & sAuthor & ": " & sContent
+        ' Fetch avatar if available
+        If Len(sAvatarHash) > 0 Then
+            Set avatarPic = FetchUserAvatar(sUserId, sAvatarHash)
+        Else
+            Set avatarPic = Nothing
+        End If
         
-        ' Add to listbox
-        ChatView1.AddMessage sAuthor, sContent
+        ' Add to chat view with avatar
+        ChatView1.AddMessage sAuthor, sContent, avatarPic
     Next i
 End Sub
-
 
 
 Private Function FormatDiscordTimestamp(sTimestamp As String) As String
@@ -1595,10 +1762,10 @@ Private Sub Form_Load()
     m_bGatewayReady = False ' Add this line
         If Len(m_sToken) > 0 Then
             'FetchChannelMessages txtCID.Text
-            FetchMeDetails
             
             FetchUserGuilds
             
+            FetchMeDetails
         ConnectToGateway
         End If
 End Sub
@@ -1891,7 +2058,7 @@ Private Sub FetchUserGuilds()
     tlsSocket.SyncConnect m_sBaseUrl, 443, , , ucsTlsSupportAll Or ucsTlsIgnoreServerCertificateErrors
     
     ' Send request
-    tlsSocket.SyncSendText sRequest
+    tlsSocket.SendText sRequest
     
     ' Receive initial response
     sResponse = tlsSocket.SyncReceiveText
@@ -1960,20 +2127,114 @@ Private Sub FetchUserGuilds()
 End Sub
 
 Private Sub FetchMePicture(sUserId As String, sAvatarHash As String)
-'MsgBox "hi"
-    Set m_oHttpDownload = New cHttpDownload
-
-'m_oHttpDownload.DownloadFile "https://cdn.discordapp.com/avatars/" & sUserId & "/" & sAvatarHash & ".jpg", Environ$("TMP") & "\" & sUserId & ".jpg"
-
    
-m_oHttpDownload.DownloadFile "https://cdn.discordapp.com/avatars/872926577858609182/4b696cfd0ac0c2ff9be940ca26881cfe.jpg?size=1024", Environ$("TMP") & "\" & "hiee" & ".jpg" '    m_oHttpDownload.DownloadFile IIf(chkUseHttps.Value = vbChecked, "https", "http") & "://dl.unicontsoft.com/upload/aaa.zip", Environ$("TMP") & "\aaa.zip"
-   Exit Sub
-End Sub
-Private Sub m_oHttpDownload_DownloadComplete(ByVal LocalFileName As String)
-    Const FUNC_NAME     As String = "m_oHttpDownload_DownloadComplete"
+ Const FUNC_NAME As String = "Command2_Click"
+    On Error GoTo EH
     
-    MsgBox "Download to " & LocalFileName & " complete", vbExclamation
+    Dim sUrl As String
+    Dim sTempPath As String
+    Dim sFileName As String
+    Dim sContentType As String
+    Dim sExtension As String
+    Dim vResponseBody() As Byte
+    Dim iFileNum As Integer
+    
+    ' Discord avatar URL (replace with your actual URL)
+    sUrl = "https://cdn.discordapp.com/avatars/872926577858609182/4b696cfd0ac0c2ff9be940ca26881cfe.jpg?size=1024"
+    
+    ' Initialize HTTP request
+    If m_oRequest Is Nothing Then
+        Set m_oRequest = New cHttpRequest
+    End If
+     m_oRequest.Option_(WinHttpRequestOption_SslErrorIgnoreFlags) = SslErrorFlag_Ignore_All
+    ' Configure request
+    m_oRequest.SetTimeouts 5000, 5000, 5000, 5000
+    m_oRequest.Option_(WinHttpRequestOption_EnableHttpsToHttpRedirects) = True
+    m_oRequest.Open_ "GET", sUrl
+    m_oRequest.SetRequestHeader "User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4638.69 Safari/537.36"
+    
+    ' Send request
+    m_oRequest.Send
+    
+    ' Check for successful response
+    If m_oRequest.Status <> 200 Then
+        MsgBox "Failed to download image. Status: " & m_oRequest.Status, vbExclamation
+        Exit Sub
+    End If
+    
+    
+    ' Generate filename in temp folder
+    sTempPath = Environ("TEMP")
+    sFileName = sTempPath & "\Discord_PFP_" & sUserId & ".jpg"
+    
+    ' Save binary data to file
+    vResponseBody = m_oRequest.ResponseBody
+    iFileNum = FreeFile
+    Open sFileName For Binary Access Write As #iFileNum
+    Put #iFileNum, , vResponseBody
+    Close #iFileNum
+    
+Dim img As Picture
+Set img = LoadPicture(sFileName)
+
+' Clear the existing image
+
+' Set AutoRedraw so the picture stays
+upfp.Picture = img
+' Optional: Set ScaleMode (usually vbPixels is easiest)
+
+' Draw the image resized to fit the PictureBox
+
+
+' Save the resized image into Picture2.Picture if needed
+'Set Picture2.Picture = Picture2.Image
+
+    Exit Sub
+EH:
+    MsgBox Err.Description & " [" & Replace(Err.Source, vbCrLf, "; ") & "]", vbCritical, FUNC_NAME
 End Sub
+
+Private Sub Command1_Click()
+    Const FUNC_NAME As String = "Command1_Click"
+    Dim sUrl As String
+    Dim slocalfile As String
+    
+    On Error GoTo EH
+    
+    ' Set up the download
+    Set m_oHttpDownload = New cHttpDownload
+    
+    sUrl = "https://cdn.discordapp.com/avatars/872926577858609182/4b696cfd0ac0c2ff9be940ca26881cfe.jpg?size=1024"
+    slocalfile = Environ$("TMP") & "\aaa.jpg"
+    
+    Debug.Print "Starting download from: " & sUrl
+    Debug.Print "Saving to: " & slocalfile
+    
+    ' Start the download
+    m_oHttpDownload.DownloadFile sUrl, slocalfile
+    
+    Exit Sub
+EH:
+    MsgBox "Error in " & FUNC_NAME & ": " & Err.Description, vbCritical
+End Sub
+
+' Essential event handlers for debugging
+Private Sub m_oHttpDownload_OperationStart()
+    Debug.Print "Download operation started"
+End Sub
+
+Private Sub m_oHttpDownload_DownloadComplete(ByVal LocalFileName As String)
+
+'Picture2.Picture = LoadPicture(Environ$("TMP") & "\aaa.jpg")
+End Sub
+
+Private Sub m_oHttpDownload_OperationError(ByVal Number As Long, ByVal Description As String, ByVal Source As String)
+    Debug.Print "Download error: " & Description & " (Error #" & Number & ")"
+    MsgBox "Download failed!" & vbCrLf & "Error: " & Description & vbCrLf & "Source: " & Source, vbCritical
+End Sub
+
+
+
 Private Sub FetchMeDetails()
   
   Dim chtlsSocket As New cTlsSocket
@@ -1999,7 +2260,7 @@ Private Sub FetchMeDetails()
               "Connection: close" & vbCrLf & vbCrLf
     
     ' Send request
-    chtlsSocket.SyncSendText sRequest
+    chtlsSocket.SendText sRequest
     
     ' Receive initial response
     sResponse = chtlsSocket.SyncReceiveText
@@ -2036,7 +2297,7 @@ Private Sub FetchMeDetails()
             End If
             
             ' Receive more data
-            sResponse = chtlsSocket.SyncReceiveText
+            sResponse = chtlsSocket.ReceiveText
             If Len(sResponse) = 0 Then Exit Do
             sFullResponse = sFullResponse & sResponse
         Loop
@@ -2046,7 +2307,7 @@ Private Sub FetchMeDetails()
     ElseIf lContentLength > 0 Then
         ' For non-chunked with Content-Length, receive until we have all data
         Do While Len(sFullResponse) - headersEnd - 3 < lContentLength
-            sResponse = chtlsSocket.SyncReceiveText
+            sResponse = chtlsSocket.ReceiveText
             If Len(sResponse) = 0 Then Exit Do
             sFullResponse = sFullResponse & sResponse
         Loop
@@ -2055,7 +2316,7 @@ Private Sub FetchMeDetails()
         ' Fallback for responses without Content-Length or chunked encoding
         sBody = Mid$(sFullResponse, headersEnd + 4)
     End If
-    
+    'MsgBox sBody
     ' Process the JSON response
     Dim jparse As Dictionary
     Set jparse = Parse(sBody).Value
@@ -2069,13 +2330,13 @@ Private Sub FetchMeDetails()
     If Not IsNull(jparse("avatar")) Then
         sAvatarHash = jparse("avatar")
         ' Fetch the profile picture
-        FetchMePicture sUserId, sAvatarHash
     End If
     
     ' Clean up
     chtlsSocket.Close_
     Set chtlsSocket = Nothing
     
+        FetchMePicture sUserId, sAvatarHash
     Exit Sub
 
 End Sub
@@ -2202,7 +2463,7 @@ Private Sub FetchUserDMs()
     tlsSocket.SyncConnect m_sBaseUrl, 443, , , ucsTlsSupportAll Or ucsTlsIgnoreServerCertificateErrors
     
     ' Send request
-    tlsSocket.SyncSendText sRequest
+    tlsSocket.SendText sRequest
     
     ' Receive initial response
     sResponse = tlsSocket.SyncReceiveText
@@ -2355,7 +2616,6 @@ Private Sub FetchChannelMessages(ByVal sChannelId As String, Optional ByVal lLim
     
     ' Convert the response body from UTF-8 to UTF-16 using the API function
 
-    
     ' Process the JSON response
     ProcessMessagesResponse sBody
     
@@ -2429,7 +2689,7 @@ Private Function DecodeChunkedResponse(sResponse As String) As String
         ' Move to next chunk (after data + CRLF)
         lPos = lPos + lChunkSize + 2
     Loop
-    
+On Error Resume Next
     DecodeChunkedResponse = Left$(sResult, Len(sResult) - 1)
 End Function
 Private Sub SendDiscordMessage(ByVal sChannelId As String, ByVal sMessage As String)
@@ -2457,7 +2717,7 @@ Private Sub SendDiscordMessage(ByVal sChannelId As String, ByVal sMessage As Str
     tlsSocket.SyncConnect "discord.com", 443, , , ucsTlsSupportAll Or ucsTlsIgnoreServerCertificateErrors
     
     ' Send request
-    tlsSocket.SyncSendText sRequest
+    tlsSocket.SendText sRequest
     
     ' Receive response (blocking)
     sResponse = tlsSocket.SyncReceiveText
