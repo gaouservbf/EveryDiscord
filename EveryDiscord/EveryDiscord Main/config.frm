@@ -180,7 +180,7 @@ Form6.Show
 End Sub
 
 Private Sub TabStrip1_Click()
-If TabStrip1.SelectedItem = 1 Then
+If TabStrip1.SelectedItem.Index = 0 Then
 
 End If
 End Sub

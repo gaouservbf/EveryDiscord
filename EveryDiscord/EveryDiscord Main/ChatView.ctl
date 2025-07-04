@@ -15,6 +15,7 @@ Begin VB.UserControl ChatView
       Italic          =   0   'False
       Strikethrough   =   0   'False
    EndProperty
+   ForwardFocus    =   -1  'True
    ScaleHeight     =   240
    ScaleMode       =   3  'Pixel
    ScaleWidth      =   320
@@ -31,11 +32,14 @@ Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = True
 Attribute VB_PredeclaredId = False
 Attribute VB_Exposed = False
+'chatview.ctl
 Private Type ChatMessage
     UserName As String
+    UserId As String ' Added for status tracking
     Text As String
     Avatar As StdPicture ' optional
     RenderedHeight As Long ' cached height after word wrapping
+    status As String ' "online", "idle", "dnd", "offline", "invisible"
 End Type
 
 Private Type TextElement
@@ -47,25 +51,42 @@ Private Type TextElement
     IsBold As Boolean
     IsItalic As Boolean
 End Type
+
+Private Type userStatus
+    UserId As String
+    status As String ' "online", "idle", "dnd", "offline", "invisible"
+End Type
+
 Private TopIndex As Long
 Private Messages() As ChatMessage
 Private MessageCount As Long
+Private UserStatuses() As userStatus ' Array to track user statuses
+Private UserStatusCount As Long
 Private Const BaseLineHeight As Long = 16
 Private Const MessagePadding As Long = 4
 Private EmojiCache As Collection ' Cache loaded emojis
 Private IsUserScrolling As Boolean ' Track if user is manually scrolling
 Private AutoScrollEnabled As Boolean ' Track if autoscroll should happen
 
+' Status colors
+Private Const StatusOnline As Long = vbGreen
+Private Const StatusIdle As Long = vbYellow
+Private Const StatusDnd As Long = vbRed
+Private Const StatusOffline As Long = &H80848E ' Gray
+Private Const StatusInvisible As Long = &H80848E ' Gray (same as offline)
+
 Private Sub UserControl_Initialize()
     Set EmojiCache = New Collection
     IsUserScrolling = False
     AutoScrollEnabled = True
+    UserStatusCount = 0
+    ReDim UserStatuses(0)
 End Sub
 
-Public Sub AddMessage(ByVal UserName As String, ByVal Texts As String, Optional Avatar As StdPicture)
+Public Sub AddMessage(ByVal UserName As String, ByVal UserId As String, ByVal Texts As String, Optional Avatar As StdPicture, Optional status As String = "offline")
     ' Check if we should autoscroll (only if user is at or near bottom)
     Dim ShouldAutoScroll As Boolean
-    ShouldAutoScroll = AutoScrollEnabled And (vsbChat.Value >= vsbChat.Max - (BaseLineHeight * 2))
+    ShouldAutoScroll = AutoScrollEnabled And (vsbChat.value >= vsbChat.Max - (BaseLineHeight * 2))
     
     Dim Text() As String
     Text = Split(Texts, vbLf)
@@ -73,11 +94,16 @@ Public Sub AddMessage(ByVal UserName As String, ByVal Texts As String, Optional 
     For i = 0 To UBound(Text) Step 1
         ReDim Preserve Messages(MessageCount)
         Messages(MessageCount).UserName = UserName
+        Messages(MessageCount).UserId = UserId
         Messages(MessageCount).Text = Text(i)
         Set Messages(MessageCount).Avatar = Avatar
         Messages(MessageCount).RenderedHeight = 0 ' Will be calculated during render
+        Messages(MessageCount).status = status
         MessageCount = MessageCount + 1
     Next
+    
+    ' Update user status if not already tracked
+    UpdateUserStatus UserId, status
     
     UpdateScrollbar
     
@@ -87,6 +113,77 @@ Public Sub AddMessage(ByVal UserName As String, ByVal Texts As String, Optional 
     End If
     
     UserControl.Refresh
+End Sub
+
+' Public method to get a user's current status
+Public Function GetUserStatus(ByVal UserId As String) As String
+    Dim i As Long
+    For i = 0 To UserStatusCount - 1
+        If UserStatuses(i).UserId = UserId Then
+            GetUserStatus = UserStatuses(i).status
+            Exit Function
+        End If
+    Next i
+    GetUserStatus = "offline" ' Default if not found
+End Function
+
+Public Sub UpdateUserStatus(ByVal UserId As String, ByVal status As String)
+    ' Check if user already exists in status array
+    Dim i As Long
+    For i = 0 To UserStatusCount - 1
+        If UserStatuses(i).UserId = UserId Then
+            UserStatuses(i).status = status
+            Exit Sub
+        End If
+    Next i
+    
+    ' User not found, add new entry
+    If UserStatusCount = 0 Then
+        ReDim UserStatuses(0)
+    Else
+        ReDim Preserve UserStatuses(UserStatusCount)
+    End If
+    
+    UserStatuses(UserStatusCount).UserId = UserId
+    UserStatuses(UserStatusCount).status = status
+    UserStatusCount = UserStatusCount + 1
+    UserControl.Refresh
+End Sub
+
+Private Function GetStatusColor(ByVal status As String) As Long
+    Select Case LCase(status)
+        Case "online"
+            GetStatusColor = StatusOnline
+        Case "idle", "away"
+            GetStatusColor = StatusIdle
+        Case "dnd", "busy"
+            GetStatusColor = StatusDnd
+        Case "invisible"
+            GetStatusColor = StatusInvisible
+        Case Else ' "offline" or unknown
+            GetStatusColor = StatusOffline
+    End Select
+End Function
+
+Private Sub DrawStatusFrame(ByVal X As Long, ByVal Y As Long, ByVal Size As Long, ByVal status As String)
+    Dim StatusColor As Long
+    StatusColor = GetStatusColor(status)
+    
+    ' Don't draw frame for offline users (makes it cleaner)
+    If LCase(status) = "offline" Then Exit Sub
+    
+    ' Draw outer frame (slightly larger than avatar)
+    Dim FrameSize As Long
+    FrameSize = Size + 3 ' 3 pixels border on each side
+    Dim FrameX As Long, FrameY As Long
+    FrameX = X - 2
+    FrameY = Y - 2
+    
+    ' Draw the colored border as a thick rectangle outline
+    UserControl.Line (FrameX, FrameY)-(FrameX + FrameSize, FrameY + 2), StatusColor, BF ' Top
+    UserControl.Line (FrameX, FrameY)-(FrameX + 2, FrameY + FrameSize), StatusColor, BF ' Left
+    UserControl.Line (FrameX + FrameSize - 2, FrameY)-(FrameX + FrameSize, FrameY + FrameSize), StatusColor, BF ' Right
+    UserControl.Line (FrameX, FrameY + FrameSize - 2)-(FrameX + FrameSize, FrameY + FrameSize), StatusColor, BF ' Bottom
 End Sub
 
 Public Sub Clear()
@@ -100,8 +197,8 @@ End Sub
 
 Private Sub ScrollToBottom()
     If vsbChat.Max > 0 Then
-        vsbChat.Value = vsbChat.Max
-        TopIndex = vsbChat.Value
+        vsbChat.value = vsbChat.Max
+        TopIndex = vsbChat.value
     End If
 End Sub
 
@@ -684,7 +781,7 @@ Private Sub UserControl_Resize()
     
     ' Remember current scroll position relative to bottom
     Dim WasAtBottom As Boolean
-    WasAtBottom = (vsbChat.Value >= vsbChat.Max - (BaseLineHeight * 2))
+    WasAtBottom = (vsbChat.value >= vsbChat.Max - (BaseLineHeight * 2))
     
     ' Recalculate message heights since width changed
     Dim i As Long
@@ -703,11 +800,11 @@ Private Sub UserControl_Resize()
 End Sub
 
 Private Sub vsbChat_Change()
-    TopIndex = vsbChat.Value
+    TopIndex = vsbChat.value
     UserControl.Refresh
     
     ' Check if user manually scrolled away from bottom
-    If vsbChat.Value < vsbChat.Max - (BaseLineHeight * 2) Then
+    If vsbChat.value < vsbChat.Max - (BaseLineHeight * 2) Then
         AutoScrollEnabled = False
     Else
         AutoScrollEnabled = True
@@ -715,18 +812,18 @@ Private Sub vsbChat_Change()
 End Sub
 
 Private Sub vsbChat_Scroll()
-    TopIndex = vsbChat.Value
+    TopIndex = vsbChat.value
     UserControl.Refresh
     
     ' Check if user manually scrolled away from bottom
-    If vsbChat.Value < vsbChat.Max - (BaseLineHeight * 2) Then
+    If vsbChat.value < vsbChat.Max - (BaseLineHeight * 2) Then
         AutoScrollEnabled = False
     Else
         AutoScrollEnabled = True
     End If
 End Sub
-
 Private Sub UserControl_Paint()
+    
     Dim i As Long
     Dim CurrentY As Long
     Dim AvatarSize As Long: AvatarSize = 32
@@ -741,8 +838,12 @@ Private Sub UserControl_Paint()
         End If
         
         If CurrentY + Messages(i).RenderedHeight > 0 And CurrentY < UserControl.ScaleHeight Then
+            ' Draw status frame first (behind avatar)
+            Call DrawStatusFrame(Margin, CurrentY, AvatarSize, GetUserStatus(Messages(i).UserId))
+            
             ' Draw avatar
             If Not Messages(i).Avatar Is Nothing Then
+            On Error Resume Next
                 UserControl.PaintPicture Messages(i).Avatar, Margin, CurrentY, AvatarSize, AvatarSize
             Else
                 UserControl.Line (Margin, CurrentY)-(Margin + AvatarSize, CurrentY + AvatarSize), vbGrayText, BF
@@ -757,11 +858,12 @@ Private Sub UserControl_Paint()
             
             ' Draw wrapped message text with markdown
             UserControl.FontBold = False
-            Call DrawWrappedMessage(i, Margin + AvatarSize + 8, CurrentY + 14)
+            Call DrawWrappedMessage(i, Margin + AvatarSize + 10, CurrentY + 16)
         End If
         
         CurrentY = CurrentY + Messages(i).RenderedHeight + MessagePadding
     Next i
+    
 End Sub
 
 ' Public method to manually scroll to bottom (useful for "scroll to bottom" button)
@@ -775,3 +877,39 @@ End Sub
 Public Property Get IsAutoScrollEnabled() As Boolean
     IsAutoScrollEnabled = AutoScrollEnabled
 End Property
+
+Public Function GetTrackedUserIds() As String()
+    Dim UserIds() As String
+    If UserStatusCount = 0 Then
+        ReDim UserIds(0)
+        GetTrackedUserIds = UserIds
+        Exit Function
+    End If
+    
+    ReDim UserIds(UserStatusCount - 1)
+    Dim i As Long
+    For i = 0 To UserStatusCount - 1
+        UserIds(i) = UserStatuses(i).UserId
+    Next i
+    GetTrackedUserIds = UserIds
+End Function
+
+Public Function GetStatusCounts() As String
+    Dim OnlineCount As Long, IdleCount As Long, DndCount As Long, OfflineCount As Long
+    Dim i As Long
+    
+    For i = 0 To UserStatusCount - 1
+        Select Case LCase(UserStatuses(i).status)
+            Case "online"
+                OnlineCount = OnlineCount + 1
+            Case "idle", "away"
+                IdleCount = IdleCount + 1
+            Case "dnd", "busy"
+                DndCount = DndCount + 1
+            Case Else
+                OfflineCount = OfflineCount + 1
+        End Select
+    Next i
+    
+    GetStatusCounts = "Online: " & OnlineCount & ", Idle: " & IdleCount & ", DND: " & DndCount & ", Offline: " & OfflineCount
+End Function

@@ -13,11 +13,27 @@ Begin VB.Form Form1
    ScaleMode       =   3  'Pixel
    ScaleWidth      =   681
    StartUpPosition =   3  'Windows Default
+   Begin EveryDiscord.ChatView ChatView1 
+      Height          =   7095
+      Left            =   3480
+      TabIndex        =   16
+      Top             =   480
+      Width           =   4935
+      _ExtentX        =   8705
+      _ExtentY        =   12515
+   End
+   Begin VB.ListBox memlist 
+      Height          =   7080
+      Left            =   8400
+      TabIndex        =   15
+      Top             =   480
+      Width           =   1815
+   End
    Begin VB.CommandButton Emojiz 
       Height          =   435
       Left            =   9765
       Style           =   1  'Graphical
-      TabIndex        =   13
+      TabIndex        =   12
       Top             =   7560
       Width           =   435
    End
@@ -34,7 +50,7 @@ Begin VB.Form Form1
       Left            =   1320
       ScaleHeight     =   495
       ScaleWidth      =   8790
-      TabIndex        =   10
+      TabIndex        =   9
       Top             =   0
       Width           =   8790
       Begin VB.Label lblChannel 
@@ -52,7 +68,7 @@ Begin VB.Form Form1
          ForeColor       =   &H8000000E&
          Height          =   210
          Left            =   2520
-         TabIndex        =   12
+         TabIndex        =   11
          Top             =   210
          Width           =   6270
       End
@@ -72,7 +88,7 @@ Begin VB.Form Form1
          ForeColor       =   &H8000000E&
          Height          =   270
          Left            =   0
-         TabIndex        =   11
+         TabIndex        =   10
          Top             =   210
          Width           =   2175
       End
@@ -90,7 +106,7 @@ Begin VB.Form Form1
       EndProperty
       Height          =   435
       Left            =   2520
-      TabIndex        =   8
+      TabIndex        =   7
       Top             =   7560
       Width           =   435
    End
@@ -155,8 +171,9 @@ Begin VB.Form Form1
       BorderStyle     =   0  'None
       Height          =   1080
       Left            =   0
-      ScaleHeight     =   1080
-      ScaleWidth      =   2775
+      ScaleHeight     =   72
+      ScaleMode       =   3  'Pixel
+      ScaleWidth      =   185
       TabIndex        =   3
       Top             =   6975
       Width           =   2775
@@ -173,9 +190,17 @@ Begin VB.Form Form1
          EndProperty
          Height          =   330
          Left            =   1560
-         TabIndex        =   9
+         TabIndex        =   8
          Top             =   630
          Width           =   855
+      End
+      Begin VB.Image status 
+         Height          =   270
+         Left            =   960
+         Picture         =   "Form1.frx":49D6A
+         Stretch         =   -1  'True
+         Top             =   720
+         Width           =   270
       End
       Begin VB.Image upfp 
          Height          =   615
@@ -280,15 +305,6 @@ Begin VB.Form Form1
       _Version        =   393216
       RemotePort      =   443
    End
-   Begin EveryDiscord.ChatView ChatView1 
-      Height          =   7020
-      Left            =   3480
-      TabIndex        =   6
-      Top             =   480
-      Width           =   6735
-      _ExtentX        =   11880
-      _ExtentY        =   12383
-   End
    Begin MSWinsockLib.Winsock wsGuildIcon 
       Index           =   1
       Left            =   0
@@ -310,7 +326,7 @@ Begin VB.Form Form1
    Begin EveryDiscord.GuildView GuildView1 
       Height          =   6975
       Left            =   0
-      TabIndex        =   7
+      TabIndex        =   6
       Top             =   0
       Width           =   1335
       _ExtentX        =   2355
@@ -327,7 +343,7 @@ Begin VB.Form Form1
       Align           =   2  'Align Bottom
       Height          =   375
       Left            =   0
-      TabIndex        =   14
+      TabIndex        =   13
       Top             =   7995
       Width           =   10215
       _ExtentX        =   18018
@@ -357,7 +373,7 @@ Begin VB.Form Form1
    Begin ComctlLib.TreeView lstChannel 
       Height          =   6495
       Left            =   1320
-      TabIndex        =   15
+      TabIndex        =   14
       Top             =   480
       Width           =   2175
       _ExtentX        =   3836
@@ -376,6 +392,22 @@ Begin VB.Form Form1
       _ExtentX        =   2805
       _ExtentY        =   820
    End
+   Begin VB.Menu mnuUser 
+      Caption         =   "User"
+      Visible         =   0   'False
+      Begin VB.Menu urstatus 
+         Caption         =   "Status"
+         Begin VB.Menu setonline 
+            Caption         =   "Online"
+         End
+         Begin VB.Menu setidle 
+            Caption         =   "Idle"
+         End
+         Begin VB.Menu setDnD 
+            Caption         =   "Do Not Disturb"
+         End
+      End
+   End
    Begin VB.Menu mnuMessages 
       Caption         =   "Messages"
       Visible         =   0   'False
@@ -390,8 +422,27 @@ Attribute VB_Creatable = False
 Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 Option Explicit
-
 DefObj A-Z
+' Add to the declarations section
+Private Type userStatus
+    UserId As String
+    status As String  ' "online", "idle", "dnd", "offline"
+    LastUpdate As Double
+End Type
+Private Type EmojiInfo
+    Name As String
+    ID As String
+    Animated As Boolean
+    GuildId As String
+    LocalPath As String
+End Type
+
+Private m_Emojis() As EmojiInfo
+Private m_EmojiCount As Long
+Private m_UserStatuses() As userStatus
+Private m_StatusCount As Long
+
+
 Private Const MODULE_NAME = "Form1"
 
 #Const ImplUseDebugLog = (USE_DEBUG_LOG <> 0)
@@ -403,7 +454,6 @@ Attribute m_oHttpDownload.VB_VarHelpID = -1
 
 Private m_dblStartTimerEx As Double
 Private m_dblNextTimerEx As Double
-Attribute m_dblNextTimerEx.VB_VarHelpID = -1
 Private WithEvents m_oRequest As cHttpRequest
 Attribute m_oRequest.VB_VarHelpID = -1
 Private m_oRootCa As cTlsSocket
@@ -423,7 +473,9 @@ Private Const DISCORD_GATEWAY_URL As String = "wss://gateway.discord.gg/?v=10&en
 Private Const DISCORD_GATEWAY_VERSION As String = "10"
 Private Const DISCORD_GATEWAY_PORT As Long = 443
 
-
+    Private sUserId As String
+    Private sAvatarHash As String
+    
 Private m_lFreeSocketIndex As Long     ' Next available socket index
 
 Private m_bGatewayReady As Boolean
@@ -465,7 +517,7 @@ Attribute tmrHeartbeat.VB_VarHelpID = -1
 
 ' Add these to your declarations section
 Private Type IconRequest
-    guildId As String
+    GuildId As String
     iconHash As String
     guildIndex As Long
 End Type
@@ -780,7 +832,9 @@ Form4.Show
 End Sub
 
 Private Sub Form_Resize()
-    ChatView1.Width = Me.ScaleWidth - GuildView1.Width - lstChannel.Width
+On Error Resume Next
+    ChatView1.Width = Me.ScaleWidth - GuildView1.Width - lstChannel.Width - memlist.Width
+    memlist.Left = ChatView1.Left + ChatView1.Width
     GuildView1.Height = Me.ScaleHeight - Picture1.Height - StatusBar1.Height
       lstChannel.Height = Me.ScaleHeight - Picture1.Height - StatusBar1.Height - lstChannel.Top
     Picture3.Width = Me.ScaleWidth - Picture3.Left
@@ -789,6 +843,7 @@ Private Sub Form_Resize()
     txtMsg.Top = Me.ScaleHeight - 810 / Screen.TwipsPerPixelY
     btnUpload.Top = Me.ScaleHeight - 810 / Screen.TwipsPerPixelY
     ChatView1.Height = Me.ScaleHeight - 1350 / Screen.TwipsPerPixelY
+    memlist.Height = ChatView1.Height
     Emojiz.Left = Me.ScaleWidth - Emojiz.Width
     txtMsg.Width = Me.ScaleWidth - txtMsg.Left - Emojiz.Width
 End Sub
@@ -796,21 +851,22 @@ End Sub
 Private Sub GuildView1_GuildSelected(ByVal Index As Long)
 If Index = 0 Then
 lstChannel.Nodes.Clear
+        Label3.Caption = "<" & "Direct Messages" & ">"
 FetchUserDMs
 Else
 DoEvents
     Dim SelectedIndex As Long
-    Dim guildId As String
+    Dim GuildId As String
     
     SelectedIndex = Index - 1
     
     If SelectedIndex >= 0 And SelectedIndex < UBound(m_GuildIds) + 1 Then
         ' Get the ID from our parallel array
-        guildId = m_GuildIds(SelectedIndex)
+        GuildId = m_GuildIds(SelectedIndex)
         
         ' Fetch channels for this guild
 DoEvents
-        FetchGuildChannels guildId
+        FetchGuildChannels GuildId
 DoEvents
         Label3.Caption = "<" & GuildView1.GetGuildName(Index) & ">"
         Me.Caption = "EveryDiscord - " & GuildView1.GetGuildName(Index)
@@ -819,6 +875,16 @@ DoEvents
 End Sub
 
 
+
+Private Sub Label1_MouseUp(Button As Integer, Shift As Integer, x As Single, y As Single)
+
+PopupMenu mnuUser, , x / Screen.TwipsPerPixelX + Label1.Left, y / Screen.TwipsPerPixelY + Label1.Top + Picture1.Top
+End Sub
+
+Private Sub Picture1_MouseUp(Button As Integer, Shift As Integer, x As Single, y As Single)
+
+PopupMenu mnuUser, , Picture1.Left + x, Picture1.Top + y
+End Sub
 
 Private Sub Timer1_Timer()
    ' FetchUserGuilds
@@ -1110,7 +1176,164 @@ DoEvents
     ' Reset socket state and buffers
     ResetSocket socketIndex
 End Sub
-
+Private Sub FetchGuildEmojis(ByVal sGuildId As String)
+    Dim tlsSocket As New cTlsSocket
+    Dim sRequest As String
+    Dim sResponse As String
+    Dim sFullResponse As String
+    
+    ' Create the API request path
+    Dim sPath As String
+    sPath = "api/v10/guilds/" & sGuildId & "/emojis"
+    
+    ' Prepare the HTTP request
+    sRequest = "GET /" & sPath & " HTTP/1.1" & vbCrLf & _
+              "Host: " & m_sBaseUrl & vbCrLf & _
+              "Authorization: " & m_sToken & vbCrLf & _
+              "Connection: close" & vbCrLf & vbCrLf
+    
+    ' Configure and connect socket
+    tlsSocket.SyncConnect m_sBaseUrl, 443, , , ucsTlsSupportAll Or ucsTlsIgnoreServerCertificateErrors
+    
+    ' Send request
+    tlsSocket.SyncSendText sRequest
+    
+    ' Receive response
+    sResponse = tlsSocket.SyncReceiveText
+    sFullResponse = sResponse
+    
+    
+    ' Process the emoji data
+   ' ProcessEmojisResponse sBody, sGuildId
+    
+    ' Clean up
+    tlsSocket.Close_
+    Set tlsSocket = Nothing
+End Sub
+Private Sub ProcessEmojisResponse(ByVal sJson As String, ByVal sGuildId As String)
+    Dim parsed As ParseResult
+    Dim i As Long
+    
+    parsed = Parse(sJson)
+    
+    If Not parsed.IsValid Then
+        Debug.Print "Error parsing emojis: " & parsed.Error
+        Exit Sub
+    End If
+    
+    ' Clear existing emojis for this guild
+    For i = 0 To m_EmojiCount - 1
+        If m_Emojis(i).GuildId = sGuildId Then
+            m_Emojis(i).Name = ""
+            m_Emojis(i).ID = ""
+            m_Emojis(i).Animated = False
+            m_Emojis(i).LocalPath = ""
+        End If
+    Next i
+    
+    ' Process each emoji
+    For i = 1 To parsed.value.Count
+        Dim emoji As Object
+        Set emoji = parsed.value(i)
+        
+        ' Only process custom emojis (not Unicode emojis)
+        If emoji("id") <> "" Then
+            ' Find empty slot or resize array
+            Dim Index As Long
+            Index = -1
+            
+            ' Look for empty slot
+            For j = 0 To m_EmojiCount - 1
+                If m_Emojis(j).Name = "" Then
+                    Index = j
+                    Exit For
+                End If
+            Next j
+            
+            ' If no empty slot, resize array
+            If Index = -1 Then
+                Index = m_EmojiCount
+                m_EmojiCount = m_EmojiCount + 1
+                ReDim Preserve m_Emojis(0 To m_EmojiCount - 1)
+            End If
+            
+            ' Store emoji info
+            With m_Emojis(Index)
+                .Name = emoji("name")
+                .ID = emoji("id")
+                .Animated = IIf(emoji("animated") = True, True, False)
+                .GuildId = sGuildId
+                .LocalPath = ""
+            End With
+            
+            ' Download the emoji image
+            DownloadEmoji m_Emojis(Index)
+        End If
+    Next i
+End Sub
+Private Sub DownloadEmoji(emoji As EmojiInfo)
+    Dim sUrl As String
+    Dim sTempPath As String
+    Dim sFileName As String
+    Dim sExtension As String
+    
+    ' Determine file extension
+    If emoji.Animated Then
+        sExtension = ".gif"
+    Else
+        sExtension = ".jpg"
+    End If
+    
+    ' Build URL
+    sUrl = "https://cdn.discordapp.com/emojis/" & emoji.ID & sExtension
+    
+    ' Create temp filename
+    sTempPath = Environ("TEMP") & "\DiscordEmojis\"
+    
+    ' Ensure directory exists
+    If Dir(sTempPath, vbDirectory) = "" Then
+        MkDir sTempPath
+    End If
+    
+    sFileName = sTempPath & emoji.ID & sExtension
+    
+    ' Only download if we haven't already
+    If Dir(sFileName) = "" Then
+        ' Use cHttpRequest for downloading
+        If m_oRequest Is Nothing Then
+            Set m_oRequest = New cHttpRequest
+        End If
+        
+        ' Configure request
+        m_oRequest.Option_(WinHttpRequestOption_SslErrorIgnoreFlags) = SslErrorFlag_Ignore_All
+        m_oRequest.SetTimeouts 5000, 5000, 5000, 5000
+        m_oRequest.Option_(WinHttpRequestOption_EnableHttpsToHttpRedirects) = True
+        m_oRequest.Open_ "GET", sUrl
+        m_oRequest.SetRequestHeader "User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4638.69 Safari/537.36"
+        
+        ' Send request
+        m_oRequest.Send
+        
+        ' Check for successful response
+        If m_oRequest.status = 200 Then
+            ' Save binary data to file
+            Dim vResponseBody() As Byte
+            vResponseBody = m_oRequest.ResponseBody
+            
+            Dim iFileNum As Integer
+            iFileNum = FreeFile
+            Open sFileName For Binary Access Write As #iFileNum
+            Put #iFileNum, , vResponseBody
+            Close #iFileNum
+            
+            ' Update emoji info with local path
+            emoji.LocalPath = sFileName
+        End If
+    Else
+        ' File already exists, just update path
+        emoji.LocalPath = sFileName
+    End If
+End Sub
 Private Sub FetchGuildIcon(ByVal sGuildId As String, ByVal sIconHash As String, ByVal guildIndex As Long)
     Const FUNC_NAME As String = "FetchGuildIcon"
     On Error GoTo EH
@@ -1150,8 +1373,8 @@ Private Sub FetchGuildIcon(ByVal sGuildId As String, ByVal sIconHash As String, 
     m_oRequest.Send
     
     ' Check for successful response
-    If m_oRequest.Status <> 200 Then
-        Debug.Print "Failed to download guild icon. Status: " & m_oRequest.Status
+    If m_oRequest.status <> 200 Then
+        Debug.Print "Failed to download guild icon. Status: " & m_oRequest.status
         Exit Sub
     End If
     
@@ -1229,8 +1452,8 @@ Public Function FetchUserAvatar(ByVal sUserId As String, ByVal sAvatarHash As St
     m_oRequest.Send
     
     ' Check for successful response
-    If m_oRequest.Status <> 200 Then
-        Debug.Print "Failed to download user avatar. Status: " & m_oRequest.Status
+    If m_oRequest.status <> 200 Then
+        Debug.Print "Failed to download user avatar. Status: " & m_oRequest.status
         Set FetchUserAvatar = LoadPicture() ' Return empty picture on failure
         Exit Function
     End If
@@ -1265,18 +1488,17 @@ Private Sub ProcessGuildsResponse(aJson As String)
     Dim parsed As ParseResult
     Dim i As Long
     Dim GuildCount As Long
-    Dim sjson As String
+    Dim sJson As String
     Dim emojiList As String
     
     DoEvents
     'sjson = Left$(aJson, Len(aJson) - 5)
-    sjson = aJson
+    sJson = aJson
     ' Parse the JSON array
-    parsed = Parse(sjson)
+    parsed = Parse(sJson)
  
     If parsed.IsValid = False Then
-    MsgBox "naw" + " " + parsed.Error
-        Exit Sub
+    MsgBox aJson
     End If
     
     ' Clear existing guilds
@@ -1286,10 +1508,10 @@ Private Sub ProcessGuildsResponse(aJson As String)
     
     ' Count guilds first to properly size the array
     GuildCount = 0
-    For i = 0 To parsed.Value.Count
+    For i = 0 To parsed.value.Count
         On Error Resume Next
         Dim guildCheck As Object
-        Set guildCheck = parsed.Value(i)
+        Set guildCheck = parsed.value(i)
         If Not guildCheck Is Nothing Then GuildCount = GuildCount + 1
         On Error GoTo 0
     Next i
@@ -1303,9 +1525,9 @@ Private Sub ProcessGuildsResponse(aJson As String)
     validGuilds = 0
     
     DoEvents
-    For i = 1 To parsed.Value.Count
+    For i = 1 To parsed.value.Count
         Dim Guild As Object
-        Set Guild = parsed.Value(i)
+        Set Guild = parsed.value(i)
         
         ' Skip if no more guilds or error
         If Guild Is Nothing Then
@@ -1335,6 +1557,7 @@ Private Sub ProcessGuildsResponse(aJson As String)
         If Len(sIconHash) > 0 Then ' Replace QueueGuildIconFetch calls with:
         
 FetchGuildIcon sGuildId, sIconHash, i
+FetchGuildEmojis sGuildId
         End If
         
         
@@ -1352,16 +1575,16 @@ Private Sub ProcessChannelsResponse(aJson As String)
     On Error Resume Next
     Dim parsed As ParseResult
     Dim i As Long
-    Dim sjson As String
+    Dim sJson As String
     Dim categoryNode As Node
     Dim channelNode As Node
     Dim currentCategory As String
     Dim channelCount As Long
     
-    sjson = aJson
+    sJson = aJson
     
     ' Parse the JSON array
-    parsed = Parse(sjson)
+    parsed = Parse(sJson)
     If parsed.IsValid = False Then
         MsgBox "Channel error!: " + parsed.Error
         Exit Sub
@@ -1372,10 +1595,10 @@ Private Sub ProcessChannelsResponse(aJson As String)
     
     ' Resize the channel IDs array
     channelCount = 0
-    For i = 1 To parsed.Value.Count
+    For i = 1 To parsed.value.Count
         On Error Resume Next
         Dim countChannel As Object
-        Set countChannel = parsed.Value(i)
+        Set countChannel = parsed.value(i)
         If Not countChannel Is Nothing Then
             If countChannel("type") = 0 Or countChannel("type") = 2 Then ' Count text and voice channels
                 channelCount = channelCount + 1
@@ -1393,10 +1616,10 @@ Private Sub ProcessChannelsResponse(aJson As String)
     channelIndex = 0
     
     ' First pass: Create category nodes
-    For i = 1 To parsed.Value.Count
+    For i = 1 To parsed.value.Count
         On Error Resume Next
         Dim channel As Object
-        Set channel = parsed.Value(i)
+        Set channel = parsed.value(i)
         
         If Not channel Is Nothing Then
             ' Only process category channels (type 4)
@@ -1418,9 +1641,9 @@ Private Sub ProcessChannelsResponse(aJson As String)
     Next i
     
     ' Second pass: Add channels under their categories
-    For i = 1 To parsed.Value.Count
+    For i = 1 To parsed.value.Count
         On Error Resume Next
-        Set channel = parsed.Value(i)
+        Set channel = parsed.value(i)
         
         If Not channel Is Nothing Then
             Dim channelType As Long
@@ -1495,20 +1718,20 @@ Private Sub ProcessDMsResponse(aJson As String)
     On Error Resume Next
     Dim parsed As ParseResult
     Dim i As Long
-    Dim sjson As String
+    Dim sJson As String
     Dim dmNode As Node
     Dim dmParentNode As Node
     Dim dmCount As Long
     
-    sjson = aJson
-    parsed = Parse(sjson)
+    sJson = aJson
+    parsed = Parse(sJson)
     
     If Not parsed.IsValid Then
         ' Save the response to debug file
         Dim iFile As Integer
         iFile = FreeFile
         Open App.Path & "\dm_error.json" For Output As #iFile
-        Print #iFile, sjson
+        Print #iFile, sJson
         Close #iFile
         
         MsgBox "Error parsing DM/GC data: " & parsed.Error & vbCrLf & _
@@ -1518,10 +1741,10 @@ Private Sub ProcessDMsResponse(aJson As String)
     
     ' Count DMs and group DMs first
     dmCount = 0
-    For i = 1 To parsed.Value.Count
+    For i = 1 To parsed.value.Count
         On Error Resume Next
         Dim countChannel As Object
-        Set countChannel = parsed.Value(i)
+        Set countChannel = parsed.value(i)
         If Not countChannel Is Nothing Then
             If countChannel("type") = 1 Or countChannel("type") = 3 Then
                 dmCount = dmCount + 1
@@ -1543,10 +1766,10 @@ Private Sub ProcessDMsResponse(aJson As String)
     Dim validDms As Long
     validDms = 0
     
-    For i = 1 To parsed.Value.Count
+    For i = 1 To parsed.value.Count
         On Error Resume Next
         Dim channel As Object
-        Set channel = parsed.Value(i)
+        Set channel = parsed.value(i)
         
         If Not channel Is Nothing Then
             Dim channelType As Long
@@ -1568,7 +1791,11 @@ Private Sub ProcessDMsResponse(aJson As String)
                         Dim recipientUser As Object
                         Set recipientUser = recipients(1) ' First recipient
                         If Not recipientUser Is Nothing Then
+                        If recipientUser("global_name") <> 0 Then
                             channelName = recipientUser("global_name")
+                            Else
+                            channelName = recipientUser("username")
+                            End If
                         Else
                             channelName = "DM with Unknown User"
                         End If
@@ -1588,11 +1815,11 @@ Private Sub ProcessDMsResponse(aJson As String)
                             Dim k As Long
                             For k = 1 To recipients.Count
                                 Set recipientUser = recipients(k)
-                                If Not recipientUser Is Nothing Then
-                                    usernames(k) = recipientUser("global_name")
-                                Else
-                                    usernames(k) = "Unknown"
-                                End If
+                        If recipientUser("global_name") <> 0 Then
+                            channelName = recipientUser("global_name")
+                            Else
+                            channelName = recipientUser("username")
+                            End If
                             Next k
                             channelName = "Group with " & Join(usernames, ", ")
                         Else
@@ -1676,10 +1903,10 @@ Private Sub ProcessMessagesResponse(aJson As String)
     Dim parsed As ParseResult
     Dim i As Long
     Dim sOutput As String
-    Dim sjson As String
+    Dim sJson As String
     
-    sjson = aJson
-    parsed = Parse(sjson)
+    sJson = aJson
+    parsed = Parse(sJson)
  
     If Not parsed.IsValid Then
         Exit Sub
@@ -1691,7 +1918,7 @@ Private Sub ProcessMessagesResponse(aJson As String)
     ' Process each message
     For i = 20 To 1 Step -1
         Dim Msg As Object
-        Set Msg = parsed.Value(i)
+        Set Msg = parsed.value(i)
         
         ' Extract message details
         Dim sAuthor As String
@@ -1717,7 +1944,7 @@ Private Sub ProcessMessagesResponse(aJson As String)
         End If
         
         ' Add to chat view with avatar
-        ChatView1.AddMessage sAuthor, sContent, avatarPic
+                ChatView1.AddMessage sAuthor, sUserId, sContent, avatarPic
     Next i
 End Sub
 
@@ -1743,6 +1970,50 @@ Private Function FormatDiscordTimestamp(sTimestamp As String) As String
         Err.Clear
     End If
 End Function
+' Add to your menu click handlers
+Private Sub mnuSetOnline_Click()
+    SetUserStatus "online"
+End Sub
+
+Private Sub mnuSetIdle_Click()
+    SetUserStatus "idle"
+End Sub
+
+Private Sub mnuSetDND_Click()
+    SetUserStatus "dnd"
+End Sub
+
+Private Sub SetUserStatus(ByVal newStatus As String)
+    ' Update our local status
+    Dim i As Long
+    For i = 0 To m_StatusCount - 1
+        If m_UserStatuses(i).UserId = sUserId Then
+            m_UserStatuses(i).status = newStatus
+            m_UserStatuses(i).LastUpdate = Now
+            Exit For
+        End If
+    Next
+    
+    ' Send status update to gateway
+    Dim statusUpdate As String
+    statusUpdate = "{""op"":3,""d"":{""since"":0,""activities"":[],""status"":""" & newStatus & """,""afk"":false}}"
+    
+            wsGateway.SendAdvanced statusUpdate, 1, True, False, True, False, False, False
+
+    ' Update our status indicator
+    Select Case newStatus
+        Case "online"
+            status.Picture = LoadPicture(App.Path & "\online.gif")
+        Case "idle"
+            status.Picture = LoadPicture(App.Path & "\idle.gif")
+        Case "dnd"
+            status.Picture = LoadPicture(App.Path & "\dnd.gif")
+        Case Else
+            status.Picture = LoadPicture(App.Path & "\offline.gif")
+    End Select
+    
+    ' Refresh chat to show our new status
+End Sub
 
 Private Sub Form_Load()
     m_sBaseUrl = "discord.com"
@@ -1765,7 +2036,8 @@ Private Sub Form_Load()
             
             FetchUserGuilds
             
-            FetchMeDetails
+          '  FetchMeDetails
+          
         ConnectToGateway
         End If
 End Sub
@@ -1848,10 +2120,10 @@ On Error Resume Next
     Dim eventData As Object
     Dim seqNum As Long
     
-    OpCode = parsed.Value("op")
-    Set eventData = parsed.Value("d")
+    OpCode = parsed.value("op")
+    Set eventData = parsed.value("d")
     
-    seqNum = parsed.Value("s")
+    seqNum = parsed.value("s")
     
     If seqNum > 0 Then
         m_lSequence = seqNum ' Store sequence number for reconnects
@@ -1859,7 +2131,7 @@ On Error Resume Next
     
     Select Case OpCode
         Case 0: ' Dispatch (event)
-            ProcessGatewayEvent parsed.Value("t"), eventData
+            ProcessGatewayEvent parsed.value("t"), eventData
             
         Case 1: ' Heartbeat
             SendHeartbeat
@@ -1912,20 +2184,67 @@ Private Sub ProcessGatewayEvent(ByVal eventType As String, ByVal eventData As Ob
     On Error Resume Next
     
     Select Case eventType
+        Case "PRESENCE_UPDATE"
+            Dim UserId As String
+            Dim newStatus As String
+            
+            UserId = eventData("user")("id")
+            newStatus = eventData("status")
+            
+      If sUserId = "912035400485330954" Then
+MsgBox "niko status real"
+End If
+            ChatView1.UpdateUserStatus UserId, newStatus
+            ' Update the chat display if this user has messages
+            
         Case "MESSAGE_CREATE"
+            Dim author As String
+            Dim userIde As String
+            Dim Content As String
+            Dim sAvatarHash As String
+            Dim avatarPic As StdPicture
+            
+            author = eventData("author")("username")
+            userIde = eventData("author")("id")
+            Content = eventData("content")
+            
+            On Error Resume Next
+            sAvatarHash = eventData("author")("avatar")
+            On Error GoTo 0
+            
+            ' Only add to current channel if it matches
             If eventData("channel_id") = m_sCurrentChannelId Then
-                Dim author As String
-                author = eventData("author")("global_name")
-                Dim Content As String
-                Content = eventData("content")
+                ' Fetch avatar if available
+                If Len(sAvatarHash) > 0 Then
+                    Set avatarPic = FetchUserAvatar(userIde, sAvatarHash)
+                Else
+                    Set avatarPic = Nothing
+                End If
                 
-                ChatView1.AddMessage author, Content
+                ' Add message with user ID and avatar
+                ChatView1.AddMessage author, userIde, Content, avatarPic
             End If
             
         Case "READY"
             StatusBar1.Panels(1).Text = "Successfully identified with Gateway"
             m_bIdentified = True
             m_sSessionId = eventData("session_id")
+            
+            ' Process user data from READY event instead of REST call
+            Dim userData As Object
+            Set userData = eventData("user")
+            
+            sUserId = userData("id")
+            Label1.Caption = userData("global_name")
+            
+            ' Handle avatar
+            On Error Resume Next
+            sAvatarHash = userData("avatar")
+            On Error GoTo 0
+            
+            If Len(sAvatarHash) > 0 Then
+                FetchMePicture sUserId, sAvatarHash
+            End If
             
             ' Clear existing guilds
            ' GuildView1.AddGuild "DMs", LoadPicture(App.Path & "\everydiscord.gif")
@@ -1934,12 +2253,12 @@ Private Sub ProcessGatewayEvent(ByVal eventType As String, ByVal eventData As Ob
  Case "GUILD_CREATE"
  MsgBox "ping"
             ' This matches your original ProcessGuildsResponse structure
-            Dim guildId As String
+            Dim GuildId As String
             Dim guildIndex As Long
             Dim sGuildName As String
             Dim sIconHash As String
             
-            guildId = eventData("id")
+            GuildId = eventData("id")
             sGuildName = eventData("name")
             MsgBox sGuildName & " h"
             On Error Resume Next
@@ -1949,12 +2268,12 @@ Private Sub ProcessGatewayEvent(ByVal eventType As String, ByVal eventData As Ob
             ' Find this guild in our array (same as REST version)
             guildIndex = -1
             For i = 0 To UBound(m_GuildIds)
-                If m_GuildIds(i) = guildId Then
+                If m_GuildIds(i) = GuildId Then
                     guildIndex = i
                     Exit For
                 ElseIf m_GuildIds(i) = "" Then
                     ' Empty slot, use this
-                    m_GuildIds(i) = guildId
+                    m_GuildIds(i) = GuildId
                     guildIndex = i
                     Exit For
                 End If
@@ -1964,7 +2283,7 @@ Private Sub ProcessGatewayEvent(ByVal eventType As String, ByVal eventData As Ob
                 ' New guild - expand array (same as before)
                 guildIndex = UBound(m_GuildIds) + 1
                 ReDim Preserve m_GuildIds(guildIndex)
-                m_GuildIds(guildIndex) = guildId
+                m_GuildIds(guildIndex) = GuildId
             End If
             
             ' Add to GuildView (same as REST version)
@@ -2004,10 +2323,10 @@ Private Sub ProcessGatewayEvent(ByVal eventType As String, ByVal eventData As Ob
 End Sub
 Private Sub SendIdentify()
     Dim identifyPayload As String
-    identifyPayload = "{""op"":2,""d"":{""token"":""" & m_sToken & """,""properties"":{""$os"":""windows"",""$browser"":""my_vb6_client"",""$device"":""my_vb6_client""},""compress"":false,""large_threshold"":250}}"
+    identifyPayload = "{""op"":2,""d"":{""token"":""" & m_sToken & """,""properties"":{""os"":""Windows"",""browser"":""Discord Client"",""release_channel"":""canary"",""client_version"":""1.0.9005"",""os_version"":""10.0.22621"",""os_arch"":""x64"",""system_locale"":""en-US"",""client_build_number"":123456,""client_event_source"":null},""presence"":{""status"":""online"",""since"":0,""activities"":[],""afk"":false},""compress"":false,""client_state"":{""guild_versions"":{},""highest_last_message_id"":""0"",""read_state_version"":0,""user_guild_settings_version"":-1,""user_settings_version"":-1,""private_channels_version"":""0"",""api_code_version"":0},""capabilities"":125,""version"":10}}"
     
     wsGateway.SendAdvanced identifyPayload, 1, True, False, True, False, False, False
- StatusBar1.Panels(1).Text = "Sent Identify payload"
+    StatusBar1.Panels(1).Text = "Sent Identify payload (Canary)"
 End Sub
 
 Private Sub SendResume()
@@ -2140,7 +2459,7 @@ Private Sub FetchMePicture(sUserId As String, sAvatarHash As String)
     Dim iFileNum As Integer
     
     ' Discord avatar URL (replace with your actual URL)
-    sUrl = "https://cdn.discordapp.com/avatars/872926577858609182/4b696cfd0ac0c2ff9be940ca26881cfe.jpg?size=1024"
+    sUrl = "https://cdn.discordapp.com/avatars/" & sUserId & "/" & sAvatarHash & ".jpg?size=1024"
     
     ' Initialize HTTP request
     If m_oRequest Is Nothing Then
@@ -2157,8 +2476,8 @@ Private Sub FetchMePicture(sUserId As String, sAvatarHash As String)
     m_oRequest.Send
     
     ' Check for successful response
-    If m_oRequest.Status <> 200 Then
-        MsgBox "Failed to download image. Status: " & m_oRequest.Status, vbExclamation
+    If m_oRequest.status <> 200 Then
+        MsgBox "Failed to download image. Status: " & m_oRequest.status, vbExclamation
         Exit Sub
     End If
     
@@ -2319,12 +2638,11 @@ Private Sub FetchMeDetails()
     'MsgBox sBody
     ' Process the JSON response
     Dim jparse As Dictionary
-    Set jparse = Parse(sBody).Value
+    Set jparse = Parse(sBody).value
     Label1.Caption = jparse("global_name")
     
     ' Extract avatar information and fetch profile picture
-    Dim sUserId As String
-    Dim sAvatarHash As String
+
     
     sUserId = jparse("id")
     If Not IsNull(jparse("avatar")) Then
@@ -2784,3 +3102,5 @@ DoEvents
 
     Exit Sub
 End Sub
+
+

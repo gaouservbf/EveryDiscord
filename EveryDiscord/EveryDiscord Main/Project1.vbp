@@ -38,6 +38,7 @@ Class=CommonDialog; ComCtl\Builds\CommonDialog.cls
 Class=cHttpRequest; ..\..\src\cHttpRequest.cls
 Class=cHttpDownload; ..\..\src\cHttpDownload.cls
 Class=cRateLimiter; ..\..\src\cRateLimiter.cls
+Class=pcMemDC; pcMemDC.cls
 IconForm="Form1"
 Startup="Form2"
 HelpFile=""
