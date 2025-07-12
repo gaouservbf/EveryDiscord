@@ -1,4 +1,5 @@
-![image](https://github.com/user-attachments/assets/b3d5481f-5e75-4626-bd70-f636d41a54d5)
+<img width="683" height="590" alt="image" src="https://github.com/user-attachments/assets/b89d5b19-b376-4b70-a4be-2851968c7c5c" />
+
 # EveryDiscord - A Discord Client for Legacy Windows
 
 A simple, fast, and reliable native Discord client for legacy Windows versions, including Windows XP and 2000.
@@ -11,7 +12,7 @@ A simple, fast, and reliable native Discord client for legacy Windows versions, 
 - Compatible with Windows XP and other legacy Windows versions
 - Basic Discord functionality in a minimal package
 - No need for SSE2 instructions
-- Plugins built in like CatBox-Based 200mb file uploads, upcoming free emoji support(F@ken1tro Backport), theming etc.
+- Plugins built in like CatBox-Based 200mb file uploads, FakeNitro for sending emotes for free like in Vencord.
 
 ## Compatibility
 
