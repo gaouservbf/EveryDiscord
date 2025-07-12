@@ -27,6 +27,7 @@ Tested on:
 ## Technical Details
 
 **Development Language:** Visual Basic 6.0  & twinBASIC
+
 **Key Dependencies:**
 - VbAsyncSocket (for network operations with TLS 1.3 without even needing SSE2)
 - VBWebSocket (for WebSocket connections)
