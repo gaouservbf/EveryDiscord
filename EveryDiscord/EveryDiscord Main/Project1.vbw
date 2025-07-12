@@ -1,4 +1,4 @@
-ChatView = 104, 104, 1441, 754, , 130, 130, 1467, 780, C
+ChatView = 104, 104, 1441, 754, Z, 130, 130, 1467, 780, C
 GuildView = 66, 87, 1465, 731, , 156, 156, 1493, 806, C
 Form1 = 635, 365, 1358, 955, , 26, 26, 731, 616, C
 Module1 = 220, 290, 1619, 934, 
@@ -21,7 +21,7 @@ Common = 0, 0, 0, 0, C
 ISubclass = 0, 0, 0, 0, C
 PPStatusBarGeneral = 0, 0, 0, 0, C, 44, 58, 1443, 702, C
 PPStatusBarPanels = 0, 0, 0, 0, C, 66, 87, 1465, 731, C
-StatusBar = 66, 87, 1465, 731, Z, 88, 116, 1487, 760, C
+StatusBar = 66, 87, 1465, 731, , 88, 116, 1487, 760, C
 VTableHandle = 0, 0, 0, 0, C
 VisualStyles = 0, 0, 0, 0, C
 mdTlsThunks = 0, 0, 1407, 652, 
