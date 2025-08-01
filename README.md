@@ -1,4 +1,4 @@
-<img width="683" height="590" alt="image" src="https://github.com/user-attachments/assets/b89d5b19-b376-4b70-a4be-2851968c7c5c" />
+<img width="689" height="592" alt="image" src="https://github.com/user-attachments/assets/07d1c330-f177-4bb3-b93d-4598264cf71b" />
 
 # EveryDiscord - A Discord Client for Legacy Windows
 
